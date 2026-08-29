@@ -156,7 +156,7 @@ flowchart TD
 
 Remotion のコンポジションは `VIDEO_COMPOSITION_ID` ("VideoComposition") の1つのみで、
 `CreateVideoRequest.templateId` に応じてシーンの見た目(レイアウト)を切り替える構成になっている。
-ワーカー (`apps/worker/src/render.ts`) は常にこの単一のコンポジションIDでレンダリングし、
+ワーカー (`apps/worker/src/infrastructure/remotion/RemotionVideoRenderer.ts`) は常にこの単一のコンポジションIDでレンダリングし、
 どのテンプレートを描画するかは `inputProps.templateId` によって実行時に決まる
 (コンポジションIDを切り替える必要はない)。
 
@@ -279,7 +279,7 @@ Amazon Polly でシーンごとのナレーション音声を自動合成する�
 | `scene.narrationSkip` (既定 false) | このシーンだけナレーションを無効化する |
 | `scene.narrationAudioUrl` (通常は自動設定) | 合成済みナレーション音声のURL。ワーカーの前処理で設定される計算済みフィールド |
 
-**処理フロー (`apps/worker/src/narration.ts` の `applyNarration`)**:
+**処理フロー (`apps/worker/src/application/usecases/ApplyNarrationUseCase.ts`)**:
 
 1. `narration.enabled` が false ならワーカーは何もせず、Pollyは一切呼び出されない。
 2. 各シーンについて `resolveNarrationText` で読み上げテキストを決定する
@@ -313,7 +313,66 @@ Amazon Polly でシーンごとのナレーション音声を自動合成する�
   (追加のインフラ・IAMロールはPollyの呼び出し権限のみ)。
 - 詳細な検討過程は [`docs/tts-narration-plan.md`](./tts-narration-plan.md) を参照。
 
-## 8. 今後の拡張候補
+## 8. ワーカーの内部構成 (クリーンアーキテクチャ)
+
+`apps/worker` は、AWS特有の実装詳細をビジネスロジックから切り離すため、
+クリーンアーキテクチャ(ヘキサゴナルアーキテクチャ)の考え方に沿って以下の3層に分割している。
+**エンティティ・ユースケース・ポートはAWS SDKに一切依存しない** ことを構造的に保証している。
+
+```
+apps/worker/src/
+  domain/                  # エンティティ層 (AWS非依存)
+    entities/
+      VideoJob.ts            - ジョブの状態判定などのドメインルール
+      RenderedVideo.ts        - レンダリング済み動画の保存先を表す値オブジェクト
+      NarrationRequest.ts     - 読み上げテキスト決定・キャッシュキー生成の純粋関数
+
+  application/             # ユースケース層・ポート層 (AWS非依存)
+    ports/                   - インターフェースのみを定義 (実装はinfrastructure層が持つ)
+      JobRepository.ts / JobQueue.ts / VideoRenderer.ts / VideoStorage.ts /
+      NotificationService.ts / SpeechSynthesizer.ts / AudioCache.ts / AudioDurationProbe.ts
+    usecases/
+      ProcessVideoJobUseCase.ts    - 1ジョブ分の処理フロー全体を統括
+      ApplyNarrationUseCase.ts     - ナレーション合成(ポート経由でPolly/S3相当を利用)
+      PollAndProcessJobsUseCase.ts - キューのポーリング〜メッセージ削除までを統括
+
+  infrastructure/          # アダプター層 (AWS/外部コマンドに依存するのはここだけ)
+    config.ts                - 環境変数の読み取り
+    aws/
+      awsClients.ts             - AWS SDKクライアントの生成
+      DynamoDbJobRepository.ts  - JobRepository の DynamoDB実装
+      SqsJobQueue.ts            - JobQueue の SQS実装
+      S3VideoStorage.ts         - VideoStorage の S3実装
+      S3AudioCache.ts           - AudioCache の S3実装 (ナレーションキャッシュ)
+      SesNotificationService.ts - NotificationService の SES実装
+      PollySpeechSynthesizer.ts - SpeechSynthesizer の Amazon Polly実装
+    remotion/
+      RemotionVideoRenderer.ts  - VideoRenderer の Remotion実装
+    system/
+      FfprobeAudioDurationProbe.ts - AudioDurationProbe の ffprobe実装
+
+  index.ts                 # Composition Root: 上記アダプターを生成しユースケースに注入する。
+                            # SQSポーリングループ・シグナルハンドリングなど、プロセスの
+                            # ライフサイクル管理もここに置く(ビジネスロジックではないため)。
+```
+
+**設計方針**:
+
+- `domain`/`application` から `infrastructure` への依存は禁止(依存の方向は常に外側→内側)。
+  `application/ports/*` はインターフェースのみを定義し、`infrastructure/*` がそれを実装する
+  (依存性逆転の原則)。`@video-generation/shared` のZodスキーマ由来の型(`CreateVideoRequest`
+  等)はAWSは元よりいかなるフレームワークにも依存しないため、そのままエンティティとして扱える。
+- **AWS認証情報が無い環境でもユニットテストが実行できる**ことが最大のメリット。
+  `ApplyNarrationUseCase.test.ts` / `ProcessVideoJobUseCase.test.ts` は、
+  ポートのインメモリ偽実装(Fake)だけを用意すれば、DynamoDB/S3/SES/Polly/Remotionの
+  いずれもモック不要で成功系・失敗系・重複防止などのフローを検証できる。
+- `index.ts` (Composition Root) だけが「どのアダプターを使うか」を知っている。
+  将来ストレージやキューを別サービスに置き換える場合も、対応するアダプターを追加して
+  `index.ts` の組み立てを差し替えるだけでよく、ユースケース側の変更は不要。
+- ロギング(`console.*`)やNode標準の `fs`/`crypto` はAWS依存ではないため、
+  簡潔さを優先しユースケース層から直接利用している(ポート化していない)。
+
+## 9. 今後の拡張候補
 
 - CloudFront + S3 で生成済み動画を配信し、`outputUrl` をCDN経由の署名付きURLにする。
 - Step Functions を挟んでレンダリングの前処理(音声合成・素材取得など)を複数ステップに分割する。

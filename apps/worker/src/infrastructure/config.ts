@@ -8,6 +8,11 @@ const requireEnv = (name: string): string => {
   return value;
 };
 
+/**
+ * ECS Fargateタスクの環境変数から読み取る設定。
+ * この値をアダプター(infrastructure層)に注入することで、ユースケース・ポートは
+ * デプロイ環境の詳細(テーブル名・キューURL等)を一切意識しなくてよくなる。
+ */
 export const config = {
   get tableName(): string {
     return requireEnv(EnvVar.TABLE_NAME);

@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsc -p tsconfig.json && node --test dist/narration.test.js",
+    "test": "tsc -p tsconfig.json && find dist -name '*.test.js' -print0 | xargs -0 node --test",
     "start": "node dist/index.js"
   },
   "dependencies": {

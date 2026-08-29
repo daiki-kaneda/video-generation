@@ -200,7 +200,7 @@ export const RemotionRoot: React.FC = () => {
       {/*
         本番の描画で実際に使われるコンポジション。
         `templateId` (inputProps) に応じてテンプレートを切り替えるため、IDはテンプレート非依存。
-        ワーカー (apps/worker/src/render.ts) は常にこの `VIDEO_COMPOSITION_ID` を指定してレンダリングする。
+        ワーカー (apps/worker/src/infrastructure/remotion/RemotionVideoRenderer.ts) は常にこの `VIDEO_COMPOSITION_ID` を指定してレンダリングする。
       */}
       <Composition
         id={VIDEO_COMPOSITION_ID}
