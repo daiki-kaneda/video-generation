@@ -1,14 +1,14 @@
 import React from "react";
 import { AbsoluteFill, useVideoConfig } from "remotion";
-import { AnimatedImage } from "../../components/AnimatedImage";
+import { SceneMedia } from "../../components/SceneMedia";
 import type { SceneTemplateComponent } from "./types";
 
 const IMAGE_PANEL_RATIO = 0.55;
 
 /**
  * 商品紹介向けテンプレート。
- * 右側に商品画像(Ken Burns対応)、左側に見出し・説明・価格/CTAバッジのパネルを配置する。
- * `imageUrl` が無い場合、右パネルは背景色のみになる。
+ * 右側に商品画像/動画クリップ(画像はKen Burns対応)、左側に見出し・説明・価格/CTAバッジのパネルを配置する。
+ * `imageUrl`/`videoUrl` が無い場合、右パネルは背景色のみになる。
  */
 export const ProductShowcaseTemplate: SceneTemplateComponent = ({
   scene,
@@ -65,10 +65,10 @@ export const ProductShowcaseTemplate: SceneTemplateComponent = ({
           width: imagePanelWidth,
           height: "100%",
           overflow: "hidden",
-          backgroundColor: scene.imageUrl ? "#000000" : panelColor,
+          backgroundColor: scene.imageUrl || scene.videoUrl ? "#000000" : panelColor,
         }}
       >
-        <AnimatedImage
+        <SceneMedia
           scene={scene}
           durationInFrames={durationInFrames}
           containerWidth={imagePanelWidth}

@@ -1,11 +1,11 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
-import { AnimatedImage } from "../../components/AnimatedImage";
+import { SceneMedia } from "../../components/SceneMedia";
 import type { SceneTemplateComponent } from "./types";
 
 /**
  * シンプルなスライドショーテンプレート。
- * 全画面の画像(または背景色)の上に、中央寄せの見出し・サブテキストを重ねるだけの構成。
+ * 全画面の画像/動画クリップ(または背景色)の上に、中央寄せの見出し・サブテキストを重ねるだけの構成。
  */
 export const SimpleTemplate: SceneTemplateComponent = ({
   scene,
@@ -19,7 +19,7 @@ export const SimpleTemplate: SceneTemplateComponent = ({
       overflow: "hidden",
     }}
   >
-    <AnimatedImage scene={scene} durationInFrames={durationInFrames} />
+    <SceneMedia scene={scene} durationInFrames={durationInFrames} />
     <div
       style={{
         position: "relative",

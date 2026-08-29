@@ -80,13 +80,26 @@ export const VideoSceneSchema = z.object({
   text: z.string().min(1).max(280).optional(),
   /** シーンのサブテキスト */
   subtext: z.string().max(280).optional(),
-  /** 背景に表示する画像 (S3 の公開/署名付きURL、または http(s) URL) */
+  /** 背景に表示する画像 (S3 の公開/署名付きURL、または http(s) URL)。videoUrl 指定時は無視される */
   imageUrl: z.string().url().optional(),
-  /** 背景色 (imageUrl が無い場合に使用, CSS color) */
+  /**
+   * 背景に合成する動画クリップ (mp4等, S3の公開/署名付きURL、または http(s) URL)。
+   * 指定時は imageUrl より優先され、シーンの表示時間いっぱいに再生される
+   * (`videoStartFromSeconds` から `durationInSeconds` 分だけ切り出す)。
+   */
+  videoUrl: z.string().url().optional(),
+  /** videoUrl 再生開始位置 (秒)。クリップの一部だけをトリミングして使う場合に指定 */
+  videoStartFromSeconds: z.number().min(0).default(0),
+  /**
+   * videoUrl クリップ自体の音量 (0〜1)。
+   * 既定はミュート(0)で、`audioUrl` のBGMと音がぶつからないようにしている。
+   */
+  videoVolume: z.number().min(0).max(1).default(0),
+  /** 背景色 (imageUrl/videoUrl が無い場合に使用, CSS color) */
   backgroundColor: z.string().max(32).optional(),
   /** シーンの表示時間 (秒) */
   durationInSeconds: z.number().positive().max(120).default(3),
-  /** 背景画像に適用する Ken Burns 風パン/ズーム。imageUrl が無い場合は無視される */
+  /** 背景画像に適用する Ken Burns 風パン/ズーム。imageUrl が無い場合、または videoUrl 指定時は無視される */
   imageAnimation: z.enum(IMAGE_ANIMATION_TYPES).default("none"),
   /** アニメーションの強さ (0〜1, 大きいほどズーム/移動量が大きい) */
   imageAnimationIntensity: z.number().min(0).max(1).default(0.15),

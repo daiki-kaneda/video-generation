@@ -91,7 +91,9 @@ const SceneItem: React.FC<SceneItemProps> = ({
     control,
     name: `scenes.${index}.imageAnimation`,
   });
-  const hasImage = Boolean(imageUrl);
+  const videoUrl = useWatch({ control, name: `scenes.${index}.videoUrl` });
+  const hasVideo = Boolean(videoUrl);
+  const hasImage = Boolean(imageUrl) && !hasVideo;
   const showIntensity = hasImage && (imageAnimation ?? "none") !== "none";
 
   return (
@@ -170,9 +172,22 @@ const SceneItem: React.FC<SceneItemProps> = ({
           背景画像URL(任意)
           <input
             {...register(`scenes.${index}.imageUrl`)}
+            disabled={hasVideo}
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
+            placeholder="https://..."
+          />
+        </label>
+
+        <label className="col-span-2 text-sm text-slate-600">
+          背景動画クリップURL(任意, mp4等)
+          <input
+            {...register(`scenes.${index}.videoUrl`)}
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-900"
             placeholder="https://..."
           />
+          <span className="mt-1 block text-xs text-slate-400">
+            指定すると背景画像URLより優先され、実写クリップがシーン全体に再生されます。
+          </span>
         </label>
 
         {BADGE_TEXT_CONFIG[templateId] ? (
@@ -218,6 +233,40 @@ const SceneItem: React.FC<SceneItemProps> = ({
               />
             </label>
           ) : null}
+        </div>
+      ) : null}
+
+      {hasVideo ? (
+        <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
+          <label className="text-sm text-slate-600">
+            再生開始位置(秒)
+            <input
+              type="number"
+              step={0.5}
+              min={0}
+              {...register(`scenes.${index}.videoStartFromSeconds`, {
+                valueAsNumber: true,
+              })}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-900"
+            />
+          </label>
+
+          <label className="text-sm text-slate-600">
+            クリップ自体の音量
+            <input
+              type="number"
+              step={0.1}
+              min={0}
+              max={1}
+              {...register(`scenes.${index}.videoVolume`, {
+                valueAsNumber: true,
+              })}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-900"
+            />
+            <span className="mt-1 block text-xs text-slate-400">
+              既定は0(ミュート)。BGM(audioUrl)と重ねたくない場合はそのままにしてください。
+            </span>
+          </label>
         </div>
       ) : null}
 

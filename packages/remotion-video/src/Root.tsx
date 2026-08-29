@@ -13,6 +13,8 @@ const commonSceneDefaults = {
   transitionDurationInSeconds: 0.5,
   imageAnimation: "none" as const,
   imageAnimationIntensity: 0.15,
+  videoStartFromSeconds: 0,
+  videoVolume: 0,
 };
 
 /** `templateId: "simple"` (本番でも使われる既定テンプレート) のサンプル */
@@ -80,6 +82,36 @@ const productShowcaseProps: CreateVideoRequest = {
       durationInSeconds: 3,
       transitionType: "wipe",
       transitionDirection: "from-left",
+    },
+  ],
+};
+
+/** `videoUrl` (実写クリップ合成) のサンプル (Remotion Studio でのプレビュー用) */
+const videoClipProps: CreateVideoRequest = {
+  title: "動画クリップ合成サンプル",
+  templateId: "simple",
+  fps: 30,
+  width: 1920,
+  height: 1080,
+  scenes: [
+    {
+      ...commonSceneDefaults,
+      text: "実写クリップを合成",
+      subtext: "<Video> の代わりに <OffthreadVideo> で正確にレンダリング",
+      videoUrl:
+        "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+      videoStartFromSeconds: 0,
+      videoVolume: 0,
+      durationInSeconds: 4,
+    },
+    {
+      ...commonSceneDefaults,
+      text: "画像とも自由に組み合わせ可能",
+      subtext: "シーンごとに画像/動画を切り替えられます",
+      imageUrl: "https://picsum.photos/1920/1080",
+      imageAnimation: "zoomOut",
+      durationInSeconds: 3,
+      transitionType: "fade",
     },
   ],
 };
@@ -164,6 +196,31 @@ export const RemotionRoot: React.FC = () => {
         width={productShowcaseProps.width}
         height={productShowcaseProps.height}
         defaultProps={productShowcaseProps}
+        schema={CreateVideoRequestSchema}
+        calculateMetadata={async ({ props }) => {
+          return {
+            durationInFrames: getTotalDurationInFrames(
+              props.scenes,
+              props.fps,
+            ),
+            fps: props.fps,
+            width: props.width,
+            height: props.height,
+          };
+        }}
+      />
+
+      <Composition
+        id={`${VIDEO_COMPOSITION_ID}-VideoClip`}
+        component={VideoComposition}
+        durationInFrames={getTotalDurationInFrames(
+          videoClipProps.scenes,
+          videoClipProps.fps,
+        )}
+        fps={videoClipProps.fps}
+        width={videoClipProps.width}
+        height={videoClipProps.height}
+        defaultProps={videoClipProps}
         schema={CreateVideoRequestSchema}
         calculateMetadata={async ({ props }) => {
           return {
