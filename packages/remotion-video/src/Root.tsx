@@ -20,6 +20,8 @@ const defaultProps: React.ComponentProps<typeof SimpleVideo> = {
       durationInSeconds: 3,
       transitionType: "fade",
       transitionDurationInSeconds: 0.5,
+      imageAnimation: "none",
+      imageAnimationIntensity: 0.15,
     },
     {
       text: "トランジション対応",
@@ -29,6 +31,18 @@ const defaultProps: React.ComponentProps<typeof SimpleVideo> = {
       transitionType: "slide",
       transitionDirection: "from-right",
       transitionDurationInSeconds: 0.6,
+      imageAnimation: "none",
+      imageAnimationIntensity: 0.15,
+    },
+    {
+      text: "Ken Burns 対応",
+      subtext: "背景画像にゆっくりズーム/パンをかけられます",
+      imageUrl: "https://picsum.photos/1920/1080",
+      durationInSeconds: 4,
+      transitionType: "fade",
+      transitionDurationInSeconds: 0.5,
+      imageAnimation: "zoomIn",
+      imageAnimationIntensity: 0.2,
     },
   ],
 };

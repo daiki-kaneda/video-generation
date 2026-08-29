@@ -1,5 +1,11 @@
 import React from "react";
-import { AbsoluteFill, Img, Audio, useVideoConfig } from "remotion";
+import {
+  AbsoluteFill,
+  Img,
+  Audio,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
 import {
   TransitionSeries,
   linearTiming,
@@ -17,6 +23,7 @@ import {
   getSceneDurationsInFrames,
   getTransitionDurationsInFrames,
 } from "../utils";
+import { getImageAnimationTransform } from "../kenBurns";
 
 export type SimpleVideoProps = CreateVideoRequest;
 
@@ -67,24 +74,49 @@ const getTransitionPresentation = (
   }
 };
 
-const SceneView: React.FC<{ scene: Scene }> = ({ scene }) => (
+const AnimatedSceneImage: React.FC<{
+  scene: Scene;
+  durationInFrames: number;
+}> = ({ scene, durationInFrames }) => {
+  const frame = useCurrentFrame();
+  const { width, height } = useVideoConfig();
+  const transform = getImageAnimationTransform(
+    scene,
+    frame,
+    durationInFrames,
+    width,
+    height,
+  );
+
+  return (
+    <Img
+      src={scene.imageUrl!}
+      style={{
+        position: "absolute",
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        transform,
+        transformOrigin: "center center",
+      }}
+    />
+  );
+};
+
+const SceneView: React.FC<{ scene: Scene; durationInFrames: number }> = ({
+  scene,
+  durationInFrames,
+}) => (
   <AbsoluteFill
     style={{
       backgroundColor: scene.backgroundColor ?? "#111827",
       justifyContent: "center",
       alignItems: "center",
+      overflow: "hidden",
     }}
   >
     {scene.imageUrl ? (
-      <Img
-        src={scene.imageUrl}
-        style={{
-          position: "absolute",
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-        }}
-      />
+      <AnimatedSceneImage scene={scene} durationInFrames={durationInFrames} />
     ) : null}
     <div
       style={{
@@ -136,7 +168,10 @@ export const SimpleVideo: React.FC<SimpleVideoProps> = ({
               durationInFrames={sceneDurations[index]}
               name={`scene-${index}`}
             >
-              <SceneView scene={scene} />
+              <SceneView
+                scene={scene}
+                durationInFrames={sceneDurations[index]}
+              />
             </TransitionSeries.Sequence>
           </React.Fragment>
         ))}
