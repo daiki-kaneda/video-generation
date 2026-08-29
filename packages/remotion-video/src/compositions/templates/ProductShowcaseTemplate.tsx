@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useVideoConfig } from "remotion";
 import { SceneMedia } from "../../components/SceneMedia";
+import { SceneNarration } from "../../components/SceneNarration";
 import type { SceneTemplateComponent } from "./types";
 
 const IMAGE_PANEL_RATIO = 0.55;
@@ -20,6 +21,7 @@ export const ProductShowcaseTemplate: SceneTemplateComponent = ({
 
   return (
     <AbsoluteFill style={{ flexDirection: "row", backgroundColor: "#0f172a" }}>
+      <SceneNarration scene={scene} />
       <div
         style={{
           width: width - imagePanelWidth,
