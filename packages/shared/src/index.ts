@@ -8,6 +8,10 @@ export {
   CreateVideoRequestSchema,
   VideoJobStatus,
   VideoJobMessageSchema,
+  SceneTransitionType,
+  SCENE_TRANSITION_TYPES,
+  SceneTransitionDirection,
+  SCENE_TRANSITION_DIRECTIONS,
 } from "./schema";
 export type {
   VideoScene,
