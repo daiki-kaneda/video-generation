@@ -145,8 +145,36 @@ flowchart TD
 - **DLQ**: `maxReceiveCount` を超えたメッセージはDLQに送り、CloudWatch Alarmで運用者に通知。
 - **コスト最適化**: Fargate はデフォルトの `desiredCount=1` の常時起動ワーカーとして実装しつつ、キュー滞留に応じてオートスケール(0台にはしない。0台にする場合はSQSトリガーでECS RunTaskを起動する設計に変更可能)。
 
-## 7. 今後の拡張候補
+## 7. Remotion コンポジション: `SimpleVideo`
+
+シーン(テキスト・サブテキスト・背景画像/背景色)を順に並べたスライドショー形式の動画テンプレート。
+シーン間の切り替えには [`@remotion/transitions`](https://www.remotion.dev/docs/transitions) の
+`TransitionSeries` を使用しており、シーンごとに演出(`transitionType`)を指定できる。
+
+| `transitionType` | 演出 | 方向指定 (`transitionDirection`) |
+|---|---|---|
+| `fade` (既定) | クロスフェード | なし |
+| `slide` | 新シーンが指定方向からスライドイン | `from-left` / `from-right` / `from-top` / `from-bottom` |
+| `wipe` | 指定方向からのワイプ | 同上 |
+| `flip` | 指定方向への回転(3D風) | 同上 |
+| `clockWipe` | 時計回りのワイプ | なし |
+| `iris` | 中心から円形に広がるワイプ | なし |
+| `none` | 演出なし(ハードカット) | なし |
+
+- `transitionType`/`transitionDirection`/`transitionDurationInSeconds` はシーン単位で指定する
+  (`packages/shared/src/schema.ts` の `VideoSceneSchema`)。先頭シーンの設定は無視される
+  (前に切り替え元のシーンが存在しないため)。
+- トランジション区間は前後シーンが時間的に重なる(クロスオーバーする)ため、動画の総尺は
+  「各シーンの尺の合計 − トランジション尺の合計」になる。`packages/remotion-video/src/utils.ts`
+  の `getTotalDurationInFrames` / `getTransitionDurationsInFrames` がこの計算を担い、
+  トランジション尺が前後シーンの尺以上にならないよう自動的にクランプする。
+- フロントエンドのシーン編集フォーム(`apps/web/src/components/SceneEditor.tsx`)から
+  シーンごとに演出・方向・長さを選択できる。
+
+## 8. 今後の拡張候補
 
 - CloudFront + S3 で生成済み動画を配信し、`outputUrl` をCDN経由の署名付きURLにする。
 - Step Functions を挟んでレンダリングの前処理(音声合成・素材取得など)を複数ステップに分割する。
 - WebSocket API (API Gateway) や SNS でリアルタイム進捗通知を追加する。
+- 画像への Ken Burns 効果(パン/ズーム)、複数テンプレート(商品紹介/ニュース向けレイアウト等)、
+  実写動画クリップ(`<Video>`)の合成、TTSによるナレーション自動生成。
