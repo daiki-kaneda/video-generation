@@ -11,9 +11,19 @@ interface SceneEditorProps {
   control: Control<VideoFormInput>;
   register: UseFormRegister<VideoFormInput>;
   errors: FieldErrors<VideoFormInput>;
+  templateId: string;
 }
 
 const MAX_SCENES = 30;
+
+/** テンプレートごとの `badgeText` の用途・表示ラベル */
+const BADGE_TEXT_CONFIG: Record<
+  string,
+  { label: string; placeholder: string } | undefined
+> = {
+  productShowcase: { label: "価格/CTAバッジ(任意)", placeholder: "¥1,980" },
+  newsBulletin: { label: "カテゴリ/速報ラベル(任意)", placeholder: "速報" },
+};
 
 const TRANSITION_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: "fade", label: "クロスフェード" },
@@ -59,6 +69,7 @@ const SceneItem: React.FC<SceneItemProps> = ({
   control,
   register,
   errors,
+  templateId,
   index,
   isFirst,
   isLast,
@@ -163,6 +174,17 @@ const SceneItem: React.FC<SceneItemProps> = ({
             placeholder="https://..."
           />
         </label>
+
+        {BADGE_TEXT_CONFIG[templateId] ? (
+          <label className="col-span-2 text-sm text-slate-600">
+            {BADGE_TEXT_CONFIG[templateId]!.label}
+            <input
+              {...register(`scenes.${index}.badgeText`)}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-900"
+              placeholder={BADGE_TEXT_CONFIG[templateId]!.placeholder}
+            />
+          </label>
+        ) : null}
       </div>
 
       {hasImage ? (
@@ -267,6 +289,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   control,
   register,
   errors,
+  templateId,
 }) => {
   const { fields, append, remove, move } = useFieldArray({
     control,
@@ -281,6 +304,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
           control={control}
           register={register}
           errors={errors}
+          templateId={templateId}
           index={index}
           isFirst={index === 0}
           isLast={index === fields.length - 1}
