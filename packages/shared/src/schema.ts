@@ -55,7 +55,24 @@ export const IMAGE_ANIMATION_TYPES = Object.values(
 ) as [ImageAnimationType, ...ImageAnimationType[]];
 
 /**
- * 1シーン分の内容。Remotion の Composition (`SimpleVideo`) が
+ * 動画全体のレイアウト・スタイル(テンプレート)。
+ * `simple`: 全画面の画像/背景色 + 中央寄せテキスト(シンプルなスライドショー)。
+ * `productShowcase`: 左に説明パネル(見出し・説明・価格/CTAバッジ)、右に商品画像。
+ * `newsBulletin`: 全画面背景 + 左上のカテゴリバッジ + 下部ロワーサード(見出し・説明) + 右下に番組名の透かし。
+ */
+export const VideoTemplateId = {
+  SIMPLE: "simple",
+  PRODUCT_SHOWCASE: "productShowcase",
+  NEWS_BULLETIN: "newsBulletin",
+} as const;
+export type VideoTemplateId =
+  (typeof VideoTemplateId)[keyof typeof VideoTemplateId];
+export const VIDEO_TEMPLATE_IDS = Object.values(
+  VideoTemplateId,
+) as [VideoTemplateId, ...VideoTemplateId[]];
+
+/**
+ * 1シーン分の内容。Remotion の Composition (`VideoComposition`) が
  * このスキーマの配列をそのまま `inputProps.scenes` として受け取る。
  */
 export const VideoSceneSchema = z.object({
@@ -82,6 +99,13 @@ export const VideoSceneSchema = z.object({
   transitionDirection: z.enum(SCENE_TRANSITION_DIRECTIONS).optional(),
   /** 切り替え演出の長さ (秒)。前後シーンの短い方の長さを超えないよう自動調整される */
   transitionDurationInSeconds: z.number().positive().max(5).default(0.5),
+  /**
+   * テンプレートごとに用途が変わる短いラベル (任意)。
+   * - `productShowcase`: 価格/CTAバッジ (例: "¥1,980", "送料無料")
+   * - `newsBulletin`: カテゴリ/速報ラベル (例: "速報", "スポーツ")
+   * - `simple`: 未使用
+   */
+  badgeText: z.string().max(40).optional(),
 });
 export type VideoScene = z.infer<typeof VideoSceneSchema>;
 
@@ -90,8 +114,10 @@ export type VideoScene = z.infer<typeof VideoSceneSchema>;
  * API Gateway -> Lambda(createVideo) が受け取るリクエストボディ。
  */
 export const CreateVideoRequestSchema = z.object({
-  /** 動画タイトル (メタデータ・通知メールにも利用) */
+  /** 動画タイトル (メタデータ・通知メールにも利用。newsBulletinテンプレートでは番組名の透かしにも使用) */
   title: z.string().min(1).max(120),
+  /** 使用するテンプレート(レイアウト・スタイル) */
+  templateId: z.enum(VIDEO_TEMPLATE_IDS).default("simple"),
   /** シーンのリスト (最低1つ) */
   scenes: z.array(VideoSceneSchema).min(1).max(30),
   /** 動画の fps */
