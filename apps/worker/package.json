@@ -1,0 +1,28 @@
+{
+  "name": "@video-generation/worker",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.687.0",
+    "@aws-sdk/client-s3": "^3.687.0",
+    "@aws-sdk/client-ses": "^3.687.0",
+    "@aws-sdk/client-sqs": "^3.687.0",
+    "@aws-sdk/lib-dynamodb": "^3.687.0",
+    "@aws-sdk/s3-request-presigner": "^3.687.0",
+    "@remotion/bundler": "^4.0.290",
+    "@remotion/renderer": "^4.0.290",
+    "@video-generation/remotion-video": "0.1.0",
+    "@video-generation/shared": "0.1.0",
+    "remotion": "^4.0.290"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.11",
+    "typescript": "^5.6.3"
+  }
+}

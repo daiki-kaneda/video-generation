@@ -1,0 +1,24 @@
+{
+  "name": "video-generation",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Remotion + AWS (API Gateway, Lambda, Cognito, SQS, Fargate, DynamoDB, S3, SES) を使った非同期動画生成ワークフロー",
+  "workspaces": [
+    "infra",
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run build --workspace=@video-generation/shared",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
