@@ -171,10 +171,31 @@ flowchart TD
 - フロントエンドのシーン編集フォーム(`apps/web/src/components/SceneEditor.tsx`)から
   シーンごとに演出・方向・長さを選択できる。
 
+### 背景画像アニメーション (Ken Burns)
+
+背景画像 (`imageUrl`) を指定したシーンには、`imageAnimation` でゆっくりとしたズーム/パンの
+アニメーション(いわゆる Ken Burns 効果)を付けられる。
+
+| `imageAnimation` | 効果 |
+|---|---|
+| `none` (既定) | アニメーションなし(静止画のまま) |
+| `zoomIn` | シーン開始から終了にかけて画像中心をゆっくり拡大 |
+| `zoomOut` | 拡大した状態から徐々に等倍へ縮小 |
+| `panLeftToRight` / `panRightToLeft` | 軽くズームした状態で視点を左右にゆっくり移動 |
+| `panTopToBottom` / `panBottomToTop` | 同上、上下方向 |
+
+- `imageAnimationIntensity` (0〜1, 既定0.15) でズーム/移動量の大きさを調整できる。
+- 実装は `packages/remotion-video/src/kenBurns.ts` の `getImageAnimationTransform`。
+  `object-fit: cover` で画面いっぱいに表示した画像にさらに `scale()` を掛けてはみ出し量(スラック)を作り、
+  そのスラックの範囲内で `translate()` することでパン時も画像の端が見切れないようにしている。
+  `transform: translate(px, py) scale(s)` の順にすることで `translate` の px/py 量が
+  `scale` の影響を受けず、計算をシンプルにしている。
+- イージングには `Easing.inOut(Easing.ease)` を用い、開始・終了が緩やかになるようにしている。
+
 ## 8. 今後の拡張候補
 
 - CloudFront + S3 で生成済み動画を配信し、`outputUrl` をCDN経由の署名付きURLにする。
 - Step Functions を挟んでレンダリングの前処理(音声合成・素材取得など)を複数ステップに分割する。
 - WebSocket API (API Gateway) や SNS でリアルタイム進捗通知を追加する。
-- 画像への Ken Burns 効果(パン/ズーム)、複数テンプレート(商品紹介/ニュース向けレイアウト等)、
-  実写動画クリップ(`<Video>`)の合成、TTSによるナレーション自動生成。
+- 複数テンプレート(商品紹介/ニュース向けレイアウト等)、実写動画クリップ(`<Video>`)の合成、
+  TTSによるナレーション自動生成。
