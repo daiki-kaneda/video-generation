@@ -95,7 +95,7 @@ flowchart TD
 | 2 | **API Gateway (HTTP API)** | `POST /videos`(動画生成リクエスト受付)、`GET /videos/{id}`(ステータス取得)、`GET /videos`(一覧取得)を公開。Cognito オーソライザーで保護。 |
 | 3 | **Lambda** | 軽量・短時間で完結するAPIロジックを実行。入力JSONのバリデーション(zod)、DynamoDBへの初期レコード作成、SQSへのジョブ投入、ステータス参照。 |
 | 4 | **SQS** | 動画生成ジョブのキュー。ワーカーの可用性・スケールに関わらずリクエストをバッファし、疎結合にする。DLQ(Dead Letter Queue)で規定回数以上失敗したメッセージを隔離。 |
-| 5 | **Fargate (ECS)** | 常時稼働(または需要に応じてオートスケール)するワーカーコンテナ。Node.js プロセスが SQS を長時間ポーリングし、Chromiumベースの Remotion レンダリング(CPU/メモリ・実行時間ともにLambdaの制約に収まらないため、コンテナで実行)を行う。 |
+| 5 | **Fargate (ECS)** | ワーカーコンテナ。Node.js プロセスが SQS を長時間ポーリングし、Chromiumベースの Remotion レンダリング(CPU/メモリ・実行時間ともにLambdaの制約に収まらないため、コンテナで実行)を行う。キューが空の間はタスク数0までスケールインし常時稼働コストをゼロにする(詳細は「6. スケーリング・信頼性の考慮」参照)。 |
 | 6 | **DynamoDB** | 動画ジョブのステータス管理テーブル。`videoId` をパーティションキーに、ステータス(QUEUED/PROCESSING/COMPLETED/FAILED)・メタデータ・S3パス・エラー内容などを保持。`userId` の GSI でユーザー別一覧取得に対応。 |
 | 7 | **S3** | 入力アセット(画像・音声など、必要な場合)、レンダリング済み動画、合成したナレーション音声のキャッシュ(`tts-cache/` prefix)の格納先。バケット分離(または prefix 分離)。 |
 | 8 | **SES** | 動画生成の成功/失敗をユーザーへメール通知。 |
@@ -146,11 +146,46 @@ flowchart TD
 
 ## 6. スケーリング・信頼性の考慮
 
-- **ワーカーの水平スケール**: Fargate Service を Application Auto Scaling で `ApproximateNumberOfMessagesVisible` (SQSのCloudWatchメトリクス) に基づきスケールさせる。
+- **ワーカーの水平スケール**: Fargate Service を Application Auto Scaling でSQSの滞留メッセージ数に基づきスケールさせる(詳細は次項)。
 - **べき等性**: `videoId` をキーにした DynamoDB 更新は冪等。SQS の at-least-once 配信を考慮し、ワーカー側で「既に `COMPLETED`/`PROCESSING` なら重複実行を避ける」ガードを入れる。
 - **可視性タイムアウト**: レンダリング時間を考慮し、SQSキューの可視性タイムアウトはワーカーの想定最大処理時間より十分長く設定(例: 15分)。長時間ジョブでは `ChangeMessageVisibility` で延長する実装も検討可能。
 - **DLQ**: `maxReceiveCount` を超えたメッセージはDLQに送り、CloudWatch Alarmで運用者に通知。
-- **コスト最適化**: Fargate はデフォルトの `desiredCount=1` の常時起動ワーカーとして実装しつつ、キュー滞留に応じてオートスケール(0台にはしない。0台にする場合はSQSトリガーでECS RunTaskを起動する設計に変更可能)。
+
+### Fargateのスケールtoゼロ (常時稼働コストの削減)
+
+Fargateタスクを常時1台起動し続けるのではなく、**SQSにメッセージが無い間はタスク数を0にする**ことで
+常時稼働コストをゼロにしている(`infra/lib/constructs/worker.ts`)。
+
+- 使用するメトリクスは `ApproximateNumberOfMessagesVisible`(受信可能なメッセージ数)ではなく、
+  処理中(受信済みだが未削除・可視性タイムアウト中)のメッセージも合算した
+  **`ApproximateNumberOfMessagesVisible + ApproximateNumberOfMessagesNotVisible`**
+  (SQS Queueの `metricApproximateNumberOfMessagesOutstanding`)を使う。
+  `Visible` だけを見てしまうと、レンダリング中のメッセージは可視性タイムアウトの間カウントされなくなるため、
+  **レンダリング中に誤ってタスクを0台にしてしまう恐れがある**。滞留数(処理中含む)が実際に0になったときのみ
+  スケールインすることで、この事故を防いでいる。
+- **スケールアウト**: 滞留数が1件以上になったら、CloudWatch Alarm(閾値1、1分間隔・1回で発報)をトリガーに
+  Application Auto Scaling のステップスケーリングポリシーでタスク数を増やす
+  (1〜9件で+1、10〜49件で+2、50件以上で+5)。0台からでも同じ仕組みで起動する。
+- **スケールイン**: 滞留数が0件の状態が5分間連続したら、別のCloudWatch Alarm(閾値0以下、5分間連続)を
+  トリガーにタスク数を**0に固定(ExactCapacity)**するポリシーを発火させる。突発的な一瞬の0件で
+  縮退しすぎないよう、スケールアウト側より長い評価期間(5分)を設けている。
+- オートスケーリングの `minCapacity` を0に設定することで、スケールインの下限を0台まで許可している。
+
+### NATゲートウェイを使わないネットワーク構成 (固定費の削減)
+
+VPCの主要な固定費であるNATゲートウェイ(時間課金 + データ処理課金)を使わず、以下の構成でコストを削減している。
+
+- Fargateタスクは**パブリックサブネット**に配置し、`assignPublicIp: true` でパブリックIPを付与、
+  インターネットゲートウェイ経由で直接アウトバウンド通信する(ユーザー指定の画像/動画URL取得、
+  ECRからのコンテナイメージ取得、CloudWatch Logsへのログ送信、SES/Pollyの呼び出しなど)。
+  タスクのセキュリティグループにはインバウンドルールを一切追加していないため、パブリックIPを
+  持っていても外部から到達可能なポートは無い(アウトバウンドのみ許可)。
+- DynamoDB・S3への通信は**Gateway VPCエンドポイント**(`vpc.addGatewayEndpoint`)経由にし、
+  インターネットを経由せずAWSネットワーク内に閉じる。Gatewayエンドポイントは追加料金が発生せず、
+  ルートテーブルに自動的に優先ルートが追加されるため、パブリックサブネットに配置していても
+  DynamoDB・S3宛の通信はエンドポイント経由になる。
+- NATゲートウェイが不要になったことで、VPCに用意するサブネットもパブリックサブネットのみでよく、
+  未使用のプライベートサブネットを作らない構成にしている。
 
 ## 7. Remotion コンポジション: `VideoComposition`
 
