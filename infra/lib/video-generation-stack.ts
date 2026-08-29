@@ -6,6 +6,7 @@ import { QueueConstruct } from "./constructs/queue";
 import { NotificationsConstruct } from "./constructs/notifications";
 import { ApiConstruct } from "./constructs/api";
 import { WorkerConstruct } from "./constructs/worker";
+import { FrontendConstruct } from "./constructs/frontend";
 
 export interface VideoGenerationStackProps extends StackProps {
   /** リソース名のプレフィックス。例: "video-gen-dev" */
@@ -46,6 +47,13 @@ export class VideoGenerationStack extends Stack {
       queue: queue.queue,
     });
 
+    const frontend = new FrontendConstruct(this, "Frontend", {
+      namePrefix: props.namePrefix,
+      apiUrl: api.httpApi.apiEndpoint,
+      userPoolId: auth.userPool.userPoolId,
+      userPoolClientId: auth.userPoolClient.userPoolClientId,
+    });
+
     new WorkerConstruct(this, "Worker", {
       namePrefix: props.namePrefix,
       table: storage.table,
@@ -68,6 +76,9 @@ export class VideoGenerationStack extends Stack {
     });
     new CfnOutput(this, "OutputBucketName", {
       value: storage.outputBucket.bucketName,
+    });
+    new CfnOutput(this, "FrontendUrl", {
+      value: `https://${frontend.distribution.distributionDomainName}`,
     });
   }
 }

@@ -1,2 +1,23 @@
-export * from "./schema";
-export * from "./constants";
+// 明示的な named export を用いる(`export * from` は避ける)。
+// `export * from` はCommonJSへコンパイルすると実行時に動的にプロパティをコピーする
+// ヘルパー関数になり、esbuild/Vite等のバンドラーが静的解析で named export を
+// 検出できず、ブラウザ(Web)側での `import { X } from "@video-generation/shared"`
+// が解決できなくなるため。
+export {
+  VideoSceneSchema,
+  CreateVideoRequestSchema,
+  VideoJobStatus,
+  VideoJobMessageSchema,
+} from "./schema";
+export type {
+  VideoScene,
+  CreateVideoRequest,
+  VideoJobRecord,
+  VideoJobMessage,
+} from "./schema";
+
+export {
+  USER_CREATED_AT_INDEX,
+  SIMPLE_VIDEO_COMPOSITION_ID,
+  EnvVar,
+} from "./constants";
