@@ -145,9 +145,48 @@ flowchart TD
 - **DLQ**: `maxReceiveCount` を超えたメッセージはDLQに送り、CloudWatch Alarmで運用者に通知。
 - **コスト最適化**: Fargate はデフォルトの `desiredCount=1` の常時起動ワーカーとして実装しつつ、キュー滞留に応じてオートスケール(0台にはしない。0台にする場合はSQSトリガーでECS RunTaskを起動する設計に変更可能)。
 
-## 7. Remotion コンポジション: `SimpleVideo`
+## 7. Remotion コンポジション: `VideoComposition`
 
-シーン(テキスト・サブテキスト・背景画像/背景色)を順に並べたスライドショー形式の動画テンプレート。
+Remotion のコンポジションは `VIDEO_COMPOSITION_ID` ("VideoComposition") の1つのみで、
+`CreateVideoRequest.templateId` に応じてシーンの見た目(レイアウト)を切り替える構成になっている。
+ワーカー (`apps/worker/src/render.ts`) は常にこの単一のコンポジションIDでレンダリングし、
+どのテンプレートを描画するかは `inputProps.templateId` によって実行時に決まる
+(コンポジションIDを切り替える必要はない)。
+
+```
+VideoComposition (packages/remotion-video/src/compositions/VideoComposition.tsx)
+  - シーンの尺・トランジションの配線(TransitionSeries)を担当する共通基盤
+  - templateId に応じて SCENE_TEMPLATES からテンプレートコンポーネントを選択し、
+    各シーンの実際の描画(見出し・画像・バッジ等のレイアウト)を委譲する
+      ├─ simple           -> SimpleTemplate.tsx (全画面 + 中央寄せテキスト)
+      ├─ productShowcase  -> ProductShowcaseTemplate.tsx (左パネル + 右商品画像)
+      └─ newsBulletin     -> NewsBulletinTemplate.tsx (全画面 + カテゴリバッジ + ロワーサード)
+```
+
+- `packages/remotion-video/src/Root.tsx` には本番と同じ `VIDEO_COMPOSITION_ID` に加え、
+  Remotion Studio でテンプレートごとのプレビューを見やすくするための
+  `VideoComposition-ProductShowcase` / `VideoComposition-NewsBulletin` という
+  プレビュー専用コンポジション(本番のレンダリングパスでは未使用)も登録している。
+- 背景画像のKen Burnsアニメーション(`packages/remotion-video/src/components/AnimatedImage.tsx`)や
+  シーン切り替えトランジション(`packages/remotion-video/src/transitions.ts`)はテンプレート非依存の
+  共通ロジックとして切り出されており、どのテンプレートを選んでも利用できる。
+
+### テンプレート一覧 (`templateId`)
+
+| `templateId` | 用途 | レイアウト概要 |
+|---|---|---|
+| `simple` (既定) | 汎用スライドショー・お知らせ・名言カードなど | 全画面の画像/背景色の上に、中央寄せの見出し・説明文を重ねる |
+| `productShowcase` | 商品紹介・広告 | 右55%に商品画像(Ken Burns対応)、左45%に見出し・説明・`badgeText`(価格/CTA)のパネル |
+| `newsBulletin` | ニュース速報・お知らせ動画 | 全画面背景 + 左上の`badgeText`(カテゴリ/速報)バッジ + 下部ロワーサード(見出し・説明) + 右上に動画タイトルの透かし |
+
+- `badgeText` (`VideoSceneSchema`) はテンプレートによって意味が変わる汎用の短いラベルフィールド
+  (`productShowcase`では価格/CTA、`newsBulletin`ではカテゴリ/速報ラベルとして描画される。`simple`では未使用)。
+- 新しいテンプレートを追加する場合は、`SceneTemplateComponent` を実装した
+  コンポーネントを作成し、`VideoComposition.tsx` の `SCENE_TEMPLATES` に登録した上で
+  `VideoTemplateId` (`packages/shared/src/schema.ts`) に選択肢を追加する。
+
+### シーン切り替えトランジション
+
 シーン間の切り替えには [`@remotion/transitions`](https://www.remotion.dev/docs/transitions) の
 `TransitionSeries` を使用しており、シーンごとに演出(`transitionType`)を指定できる。
 
@@ -197,5 +236,5 @@ flowchart TD
 - CloudFront + S3 で生成済み動画を配信し、`outputUrl` をCDN経由の署名付きURLにする。
 - Step Functions を挟んでレンダリングの前処理(音声合成・素材取得など)を複数ステップに分割する。
 - WebSocket API (API Gateway) や SNS でリアルタイム進捗通知を追加する。
-- 複数テンプレート(商品紹介/ニュース向けレイアウト等)、実写動画クリップ(`<Video>`)の合成、
-  TTSによるナレーション自動生成。
+- 実写動画クリップ(`<Video>`)の合成、TTSによるナレーション自動生成、グラフ/データビジュアライゼーション、
+  ロゴ/ウォーターマークのアップロード対応など、テンプレートで使える表現の拡充。
