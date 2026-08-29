@@ -1,6 +1,39 @@
 import { z } from "zod";
 
 /**
+ * シーン切り替えの演出タイプ (`@remotion/transitions` の presentation に対応)。
+ * `fade`: クロスフェード / `slide`: スライドイン / `wipe`: ワイプ /
+ * `flip`: 回転 / `clockWipe`: 時計回りワイプ / `iris`: 円形ワイプ / `none`: カット(演出なし)
+ */
+export const SceneTransitionType = {
+  FADE: "fade",
+  SLIDE: "slide",
+  WIPE: "wipe",
+  FLIP: "flip",
+  CLOCK_WIPE: "clockWipe",
+  IRIS: "iris",
+  NONE: "none",
+} as const;
+export type SceneTransitionType =
+  (typeof SceneTransitionType)[keyof typeof SceneTransitionType];
+export const SCENE_TRANSITION_TYPES = Object.values(
+  SceneTransitionType,
+) as [SceneTransitionType, ...SceneTransitionType[]];
+
+/** スライド・ワイプ・回転演出の方向 */
+export const SceneTransitionDirection = {
+  FROM_LEFT: "from-left",
+  FROM_RIGHT: "from-right",
+  FROM_TOP: "from-top",
+  FROM_BOTTOM: "from-bottom",
+} as const;
+export type SceneTransitionDirection =
+  (typeof SceneTransitionDirection)[keyof typeof SceneTransitionDirection];
+export const SCENE_TRANSITION_DIRECTIONS = Object.values(
+  SceneTransitionDirection,
+) as [SceneTransitionDirection, ...SceneTransitionDirection[]];
+
+/**
  * 1シーン分の内容。Remotion の Composition (`SimpleVideo`) が
  * このスキーマの配列をそのまま `inputProps.scenes` として受け取る。
  */
@@ -15,6 +48,15 @@ export const VideoSceneSchema = z.object({
   backgroundColor: z.string().max(32).optional(),
   /** シーンの表示時間 (秒) */
   durationInSeconds: z.number().positive().max(120).default(3),
+  /**
+   * 前のシーンからこのシーンへ切り替わる際の演出。
+   * 先頭シーンでは無視される (再生開始時にそのまま表示される)。
+   */
+  transitionType: z.enum(SCENE_TRANSITION_TYPES).default("fade"),
+  /** slide/wipe/flip 選択時の方向 (省略時は右から) */
+  transitionDirection: z.enum(SCENE_TRANSITION_DIRECTIONS).optional(),
+  /** 切り替え演出の長さ (秒)。前後シーンの短い方の長さを超えないよう自動調整される */
+  transitionDurationInSeconds: z.number().positive().max(5).default(0.5),
 });
 export type VideoScene = z.infer<typeof VideoSceneSchema>;
 

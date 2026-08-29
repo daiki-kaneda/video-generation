@@ -17,7 +17,14 @@ const { CreateVideoRequestSchema } = sharedSchemas;
 
 const defaultValues: VideoFormInput = {
   title: "",
-  scenes: [{ text: "", durationInSeconds: 3 }],
+  scenes: [
+    {
+      text: "",
+      durationInSeconds: 3,
+      transitionType: "fade",
+      transitionDurationInSeconds: 0.5,
+    },
+  ],
   fps: 30,
   width: 1920,
   height: 1080,

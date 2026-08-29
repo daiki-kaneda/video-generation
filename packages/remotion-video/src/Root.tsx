@@ -18,6 +18,17 @@ const defaultProps: React.ComponentProps<typeof SimpleVideo> = {
       subtext: "Remotion で生成された動画です",
       backgroundColor: "#1d4ed8",
       durationInSeconds: 3,
+      transitionType: "fade",
+      transitionDurationInSeconds: 0.5,
+    },
+    {
+      text: "トランジション対応",
+      subtext: "スライド・ワイプなど複数の演出を選択できます",
+      backgroundColor: "#0f766e",
+      durationInSeconds: 3,
+      transitionType: "slide",
+      transitionDirection: "from-right",
+      transitionDurationInSeconds: 0.6,
     },
   ],
 };
