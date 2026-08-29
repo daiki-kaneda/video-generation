@@ -14,6 +14,12 @@ import type { SceneTemplateComponent } from "./templates/types";
 
 export type VideoCompositionProps = CreateVideoRequest;
 
+/**
+ * ナレーションが存在する動画でBGM(`audioUrl`)にかける音量倍率(簡易ダッキング)。
+ * ナレーションの音声解析による動的な調整ではなく、固定値で一律に下げるだけの単純な実装。
+ */
+const BGM_VOLUME_WITH_NARRATION = 0.3;
+
 /** `templateId` -> シーンの見た目を担当するコンポーネントのマッピング */
 const SCENE_TEMPLATES: Record<
   CreateVideoRequest["templateId"],
@@ -39,10 +45,16 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({
   const sceneDurations = getSceneDurationsInFrames(scenes, fps);
   const transitionDurations = getTransitionDurationsInFrames(scenes, fps);
   const SceneTemplate = SCENE_TEMPLATES[templateId] ?? SimpleTemplate;
+  const hasNarration = scenes.some((scene) => Boolean(scene.narrationAudioUrl));
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
-      {audioUrl ? <Audio src={audioUrl} /> : null}
+      {audioUrl ? (
+        <Audio
+          src={audioUrl}
+          volume={hasNarration ? BGM_VOLUME_WITH_NARRATION : 1}
+        />
+      ) : null}
       <TransitionSeries>
         {scenes.map((scene, index) => (
           <React.Fragment key={index}>

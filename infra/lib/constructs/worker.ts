@@ -90,6 +90,14 @@ export class WorkerConstruct extends Construct {
         resources: ["*"],
       }),
     );
+    // ナレーション自動生成 (Amazon Polly) 用。Pollyはリソースレベル権限をサポートしないため resources: "*"。
+    // 合成した音声のキャッシュ・保存先は既存の outputBucket (grantReadWrite 済み) を再利用する。
+    taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ["polly:SynthesizeSpeech"],
+        resources: ["*"],
+      }),
+    );
 
     this.service = new ecs.FargateService(this, "Service", {
       cluster,

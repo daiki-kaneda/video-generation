@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import { SceneMedia } from "../../components/SceneMedia";
+import { SceneNarration } from "../../components/SceneNarration";
 import type { SceneTemplateComponent } from "./types";
 
 /**
@@ -20,6 +21,7 @@ export const SimpleTemplate: SceneTemplateComponent = ({
     }}
   >
     <SceneMedia scene={scene} durationInFrames={durationInFrames} />
+    <SceneNarration scene={scene} />
     <div
       style={{
         position: "relative",

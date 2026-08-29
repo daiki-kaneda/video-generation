@@ -48,13 +48,14 @@ flowchart TD
 
     subgraph Compute
         FG[Fargate Service: render-worker]
+        POLLY[Amazon Polly: SynthesizeSpeech]
         REMOTION[Remotion renderMedia]
     end
 
     subgraph Data
         DDB[(DynamoDB: VideoJobs)]
         S3IN[(S3: assets / input)]
-        S3OUT[(S3: rendered videos)]
+        S3OUT[(S3: rendered videos + ナレーションキャッシュ)]
     end
 
     subgraph Notify
@@ -76,6 +77,8 @@ flowchart TD
     SQS -. 再試行上限超過 .-> DLQ
     FG -- 6. status=PROCESSING 更新, メタデータ保存 --> DDB
     FG -- 7. 入力アセット取得 --> S3IN
+    FG -- 7.5 ナレーション有効時のみ音声合成 --> POLLY
+    FG -- 7.5 合成音声をキャッシュ --> S3OUT
     FG --> REMOTION
     REMOTION -- 8. mp4出力 --> FG
     FG -- 9. 生成物アップロード --> S3OUT
@@ -94,8 +97,9 @@ flowchart TD
 | 4 | **SQS** | 動画生成ジョブのキュー。ワーカーの可用性・スケールに関わらずリクエストをバッファし、疎結合にする。DLQ(Dead Letter Queue)で規定回数以上失敗したメッセージを隔離。 |
 | 5 | **Fargate (ECS)** | 常時稼働(または需要に応じてオートスケール)するワーカーコンテナ。Node.js プロセスが SQS を長時間ポーリングし、Chromiumベースの Remotion レンダリング(CPU/メモリ・実行時間ともにLambdaの制約に収まらないため、コンテナで実行)を行う。 |
 | 6 | **DynamoDB** | 動画ジョブのステータス管理テーブル。`videoId` をパーティションキーに、ステータス(QUEUED/PROCESSING/COMPLETED/FAILED)・メタデータ・S3パス・エラー内容などを保持。`userId` の GSI でユーザー別一覧取得に対応。 |
-| 7 | **S3** | 入力アセット(画像・音声など、必要な場合)と、レンダリング済み動画の格納先。バケット分離(または prefix 分離)。 |
+| 7 | **S3** | 入力アセット(画像・音声など、必要な場合)、レンダリング済み動画、合成したナレーション音声のキャッシュ(`tts-cache/` prefix)の格納先。バケット分離(または prefix 分離)。 |
 | 8 | **SES** | 動画生成の成功/失敗をユーザーへメール通知。 |
+| 9 | **Amazon Polly** | ナレーション自動生成が有効な場合、シーンのテキストを音声合成する(`SynthesizeSpeech`)。ワーカー内から直接呼び出し、専用Lambda/マイクロサービスは追加していない。 |
 
 ## 4. データモデル (DynamoDB: `VideoJobs`)
 
@@ -124,6 +128,9 @@ flowchart TD
    - `ReceiveMessage` (長時間ポーリング, `WaitTimeSeconds=20`) でメッセージを取得。
    - `videoId` を使い DynamoDB から `input` / `notifyEmail` を取得。
    - `status=PROCESSING`, `updatedAt` を更新。
+   - `narration.enabled` が true の場合、Remotionレンダリングの前に Amazon Polly でシーンごとの
+     ナレーション音声を合成し、`narrationAudioUrl`/`durationInSeconds` を確定させる
+     (詳細は「ナレーション自動生成」セクション参照)。
    - Remotion (`@remotion/renderer` + `@remotion/bundler`) でレンダリングを実行。
 
 3. **成功時**
@@ -257,11 +264,62 @@ VideoComposition (packages/remotion-video/src/compositions/VideoComposition.tsx)
   `scale` の影響を受けず、計算をシンプルにしている。
 - イージングには `Easing.inOut(Easing.ease)` を用い、開始・終了が緩やかになるようにしている。
 
+### ナレーション自動生成 (Amazon Polly)
+
+`CreateVideoRequest.narration.enabled` を true にすると、ワーカーがレンダリング前処理として
+Amazon Polly でシーンごとのナレーション音声を自動合成する。ニュース動画・ショート動画のように
+テキストを読み上げたい用途を想定した機能で、既定では無効(コストが発生するため明示的なオプトイン)。
+
+| フィールド | 説明 |
+|---|---|
+| `narration.enabled` (既定 false) | ナレーション自動生成の有効/無効 |
+| `narration.engine` (既定 `standard`) | Pollyの合成エンジン。`standard`(低コスト)/`neural`(高品質・約4倍のコスト) |
+| `narration.voiceId` (既定 `Takumi`) | 読み上げ音声。engineごとに選べる音声が異なる(`NARRATION_VOICES_BY_ENGINE`) |
+| `scene.narrationText` (任意) | このシーンで読み上げるテキストを個別に指定。未指定なら `text` + `subtext` を結合して読み上げる |
+| `scene.narrationSkip` (既定 false) | このシーンだけナレーションを無効化する |
+| `scene.narrationAudioUrl` (通常は自動設定) | 合成済みナレーション音声のURL。ワーカーの前処理で設定される計算済みフィールド |
+
+**処理フロー (`apps/worker/src/narration.ts` の `applyNarration`)**:
+
+1. `narration.enabled` が false ならワーカーは何もせず、Pollyは一切呼び出されない。
+2. 各シーンについて `resolveNarrationText` で読み上げテキストを決定する
+   (`narrationSkip` なら対象外、`narrationText` があれば優先、無ければ `text`+`subtext` を結合)。
+3. `(テキスト, engine, voiceId)` のハッシュを鍵に `s3://<outputBucket>/tts-cache/<engine>/<voiceId>/<hash>.mp3`
+   をS3で検索し、存在すれば **Pollyを呼び出さずに再利用する**(同じ文言・設定の重複合成を避けコストを削減)。
+4. キャッシュミス時のみ `Polly.SynthesizeSpeech` を呼び出し、結果をS3にキャッシュとして保存する。
+5. `ffprobe` で合成した音声ファイルの実際の再生時間を取得する(Pollyの Speech Marks
+   APIは別課金のため使用しない)。シーンの `durationInSeconds` がこの再生時間より短ければ、
+   ナレーションが途切れないよう自動的に延長する(余白0.3秒を加算)。
+6. S3の署名付きURLを `scene.narrationAudioUrl` に設定し、Remotionへの `inputProps` として渡す。
+7. 個々のシーンの合成に失敗しても例外を投げず、そのシーンをナレーションなしで処理を継続する
+   (ジョブ全体を失敗させて Fargate の再実行コストを発生させないため)。
+
+**Remotion側の再生 (`packages/remotion-video/src/components/SceneNarration.tsx`)**:
+
+- `scene.narrationAudioUrl` があれば `<Audio src={...} />` をシーンの `TransitionSeries.Sequence`
+  内に配置するだけで、シーンの開始と同時に自動的に再生される。Remotionコンポジション自体は
+  AWS SDKを一切呼び出さず、ワーカーが確定させた音声URLを再生するだけである。
+- `audioUrl` (BGM) がある場合、いずれかのシーンにナレーションがあれば BGM音量を自動的に
+  下げる簡易ダッキング(`VideoComposition.tsx` の `BGM_VOLUME_WITH_NARRATION`, 既定0.3倍)を行う。
+
+**コスト最小化の設計判断**:
+
+- 既定エンジンは最安の `standard`(100万文字あたり$4.00、`neural` は$16.00で4倍)。
+- S3キャッシュにより同一テキスト・設定の重複合成を防ぐ。
+- Speech Marks(発話タイミング情報)は別課金のため使用せず、`ffprobe` で無料に尺を取得する。
+- 同期API (`SynthesizeSpeech`) のみを使用(1シーンの最大文字数560文字は同期APIの上限3,000文字を
+  大きく下回るため非同期ジョブ化は不要)。
+- 専用Lambda/マイクロサービスを追加せず、既存のFargateワーカー内で完結させている
+  (追加のインフラ・IAMロールはPollyの呼び出し権限のみ)。
+- 詳細な検討過程は [`docs/tts-narration-plan.md`](./tts-narration-plan.md) を参照。
+
 ## 8. 今後の拡張候補
 
 - CloudFront + S3 で生成済み動画を配信し、`outputUrl` をCDN経由の署名付きURLにする。
 - Step Functions を挟んでレンダリングの前処理(音声合成・素材取得など)を複数ステップに分割する。
 - WebSocket API (API Gateway) や SNS でリアルタイム進捗通知を追加する。
 - 動画クリップのループ再生対応(クリップ尺 < シーン尺の場合)、再生速度(`playbackRate`)調整、
-  TTSによるナレーション自動生成、グラフ/データビジュアライゼーション、
-  ロゴ/ウォーターマークのアップロード対応など、テンプレートで使える表現の拡充。
+  グラフ/データビジュアライゼーション、ロゴ/ウォーターマークのアップロード対応など、
+  テンプレートで使える表現の拡充。
+- ナレーションの `neural`/`generative` エンジンへの動的アップグレード提案、SSMLタグ(間・抑揚調整)対応、
+  多言語対応(現状は日本語 `ja-JP` 固定)。

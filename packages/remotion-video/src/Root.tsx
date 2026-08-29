@@ -15,6 +15,13 @@ const commonSceneDefaults = {
   imageAnimationIntensity: 0.15,
   videoStartFromSeconds: 0,
   videoVolume: 0,
+  narrationSkip: false,
+};
+
+const narrationDisabled = {
+  enabled: false as const,
+  engine: "standard" as const,
+  voiceId: "Takumi" as const,
 };
 
 /** `templateId: "simple"` (本番でも使われる既定テンプレート) のサンプル */
@@ -24,6 +31,7 @@ const simpleProps: CreateVideoRequest = {
   fps: 30,
   width: 1920,
   height: 1080,
+  narration: narrationDisabled,
   scenes: [
     {
       ...commonSceneDefaults,
@@ -61,6 +69,7 @@ const productShowcaseProps: CreateVideoRequest = {
   fps: 30,
   width: 1920,
   height: 1080,
+  narration: narrationDisabled,
   scenes: [
     {
       ...commonSceneDefaults,
@@ -93,6 +102,7 @@ const videoClipProps: CreateVideoRequest = {
   fps: 30,
   width: 1920,
   height: 1080,
+  narration: narrationDisabled,
   scenes: [
     {
       ...commonSceneDefaults,
@@ -123,6 +133,7 @@ const newsBulletinProps: CreateVideoRequest = {
   fps: 30,
   width: 1920,
   height: 1080,
+  narration: narrationDisabled,
   scenes: [
     {
       ...commonSceneDefaults,
@@ -144,6 +155,41 @@ const newsBulletinProps: CreateVideoRequest = {
       transitionType: "fade",
       imageAnimation: "zoomOut",
       imageAnimationIntensity: 0.12,
+    },
+  ],
+};
+
+/**
+ * ナレーション合成のプレビュー用サンプル (Remotion Studio でのプレビュー・本番レンダリングパスの検証用)。
+ * `narrationAudioUrl` は本来ワーカーがPollyで合成して設定する計算済みフィールドだが、
+ * ここではプレビュー目的でダミーの音声URLを直接指定している
+ * (Remotionコンポジション自体はAWS SDKを呼ばず、確定済みの音声URLを再生するだけであることの確認)。
+ * また `audioUrl` (BGM) を設定し、ナレーション有りシーンでBGM音量が自動的に下がる
+ * (簡易ダッキング, `BGM_VOLUME_WITH_NARRATION`)ことも確認できる。
+ * BGMとナレーションには意図的に異なる音声ファイルを使用している
+ * (Remotionは同一URLの `<Audio>` を複数配置すると同一アセットとして扱い、
+ * 片方の音量設定が失われることがあるため)。
+ */
+const narrationDemoProps: CreateVideoRequest = {
+  title: "ナレーション合成サンプル",
+  templateId: "newsBulletin",
+  fps: 30,
+  width: 1920,
+  height: 1080,
+  narration: { enabled: true, engine: "standard", voiceId: "Takumi" },
+  audioUrl:
+    "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+  scenes: [
+    {
+      ...commonSceneDefaults,
+      text: "都内で大規模イベント開催",
+      subtext: "多くの来場者で賑わい、周辺は大変な混雑となりました。",
+      imageUrl: "https://picsum.photos/id/1015/1920/1080",
+      badgeText: "速報",
+      durationInSeconds: 4,
+      imageAnimation: "panLeftToRight",
+      // 本来はワーカーがPollyで合成する。ここではプレビュー用のダミー音声URL(BGMとは別ファイル)。
+      narrationAudioUrl: "https://actions.google.com/sounds/v1/alarms/beep_short.ogg",
     },
   ],
 };
@@ -221,6 +267,31 @@ export const RemotionRoot: React.FC = () => {
         width={videoClipProps.width}
         height={videoClipProps.height}
         defaultProps={videoClipProps}
+        schema={CreateVideoRequestSchema}
+        calculateMetadata={async ({ props }) => {
+          return {
+            durationInFrames: getTotalDurationInFrames(
+              props.scenes,
+              props.fps,
+            ),
+            fps: props.fps,
+            width: props.width,
+            height: props.height,
+          };
+        }}
+      />
+
+      <Composition
+        id={`${VIDEO_COMPOSITION_ID}-NarrationDemo`}
+        component={VideoComposition}
+        durationInFrames={getTotalDurationInFrames(
+          narrationDemoProps.scenes,
+          narrationDemoProps.fps,
+        )}
+        fps={narrationDemoProps.fps}
+        width={narrationDemoProps.width}
+        height={narrationDemoProps.height}
+        defaultProps={narrationDemoProps}
         schema={CreateVideoRequestSchema}
         calculateMetadata={async ({ props }) => {
           return {
