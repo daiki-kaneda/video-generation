@@ -34,6 +34,27 @@ export const SCENE_TRANSITION_DIRECTIONS = Object.values(
 ) as [SceneTransitionDirection, ...SceneTransitionDirection[]];
 
 /**
+ * 背景画像に適用する Ken Burns 風のパン/ズームアニメーション。
+ * `zoomIn`/`zoomOut`: 画像中心を基準に拡大/縮小。
+ * `panLeftToRight`等: 画像を軽くズームした状態で指定方向へゆっくり視点を移動。
+ * `none`: アニメーションなし(静止画のまま)。
+ */
+export const ImageAnimationType = {
+  NONE: "none",
+  ZOOM_IN: "zoomIn",
+  ZOOM_OUT: "zoomOut",
+  PAN_LEFT_TO_RIGHT: "panLeftToRight",
+  PAN_RIGHT_TO_LEFT: "panRightToLeft",
+  PAN_TOP_TO_BOTTOM: "panTopToBottom",
+  PAN_BOTTOM_TO_TOP: "panBottomToTop",
+} as const;
+export type ImageAnimationType =
+  (typeof ImageAnimationType)[keyof typeof ImageAnimationType];
+export const IMAGE_ANIMATION_TYPES = Object.values(
+  ImageAnimationType,
+) as [ImageAnimationType, ...ImageAnimationType[]];
+
+/**
  * 1シーン分の内容。Remotion の Composition (`SimpleVideo`) が
  * このスキーマの配列をそのまま `inputProps.scenes` として受け取る。
  */
@@ -48,6 +69,10 @@ export const VideoSceneSchema = z.object({
   backgroundColor: z.string().max(32).optional(),
   /** シーンの表示時間 (秒) */
   durationInSeconds: z.number().positive().max(120).default(3),
+  /** 背景画像に適用する Ken Burns 風パン/ズーム。imageUrl が無い場合は無視される */
+  imageAnimation: z.enum(IMAGE_ANIMATION_TYPES).default("none"),
+  /** アニメーションの強さ (0〜1, 大きいほどズーム/移動量が大きい) */
+  imageAnimationIntensity: z.number().min(0).max(1).default(0.15),
   /**
    * 前のシーンからこのシーンへ切り替わる際の演出。
    * 先頭シーンでは無視される (再生開始時にそのまま表示される)。

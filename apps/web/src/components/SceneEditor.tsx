@@ -35,6 +35,16 @@ const TRANSITION_DIRECTION_OPTIONS: { value: string; label: string }[] = [
   { value: "from-bottom", label: "下から" },
 ];
 
+const IMAGE_ANIMATION_OPTIONS: { value: string; label: string }[] = [
+  { value: "none", label: "なし(静止画)" },
+  { value: "zoomIn", label: "ゆっくりズームイン" },
+  { value: "zoomOut", label: "ゆっくりズームアウト" },
+  { value: "panLeftToRight", label: "左から右へパン" },
+  { value: "panRightToLeft", label: "右から左へパン" },
+  { value: "panTopToBottom", label: "上から下へパン" },
+  { value: "panBottomToTop", label: "下から上へパン" },
+];
+
 interface SceneItemProps extends SceneEditorProps {
   index: number;
   isFirst: boolean;
@@ -65,6 +75,13 @@ const SceneItem: React.FC<SceneItemProps> = ({
   const showDirection = DIRECTIONAL_TRANSITION_TYPES.has(
     transitionType ?? "fade",
   );
+  const imageUrl = useWatch({ control, name: `scenes.${index}.imageUrl` });
+  const imageAnimation = useWatch({
+    control,
+    name: `scenes.${index}.imageAnimation`,
+  });
+  const hasImage = Boolean(imageUrl);
+  const showIntensity = hasImage && (imageAnimation ?? "none") !== "none";
 
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
@@ -147,6 +164,40 @@ const SceneItem: React.FC<SceneItemProps> = ({
           />
         </label>
       </div>
+
+      {hasImage ? (
+        <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
+          <label className="text-sm text-slate-600">
+            画像アニメーション(Ken Burns)
+            <select
+              {...register(`scenes.${index}.imageAnimation`)}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-900"
+            >
+              {IMAGE_ANIMATION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {showIntensity ? (
+            <label className="text-sm text-slate-600">
+              強さ(ズーム/移動量)
+              <input
+                type="number"
+                step={0.05}
+                min={0}
+                max={1}
+                {...register(`scenes.${index}.imageAnimationIntensity`, {
+                  valueAsNumber: true,
+                })}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-900"
+              />
+            </label>
+          ) : null}
+        </div>
+      ) : null}
 
       {isFirst ? (
         <p className="text-xs text-slate-400">
