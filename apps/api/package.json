@@ -1,0 +1,22 @@
+{
+  "name": "@video-generation/api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.687.0",
+    "@aws-sdk/client-sqs": "^3.687.0",
+    "@aws-sdk/lib-dynamodb": "^3.687.0",
+    "@video-generation/shared": "0.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^20.16.11",
+    "typescript": "^5.6.3"
+  }
+}

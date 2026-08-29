@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+out/
+*.log
+.DS_Store
+
+# CDK
+cdk.out/
+*.d.ts
+!**/src/**/*.d.ts
+.cdk.staging/
+
+# Remotion
+apps/worker/out/
+packages/remotion-video/out/
+
+# env
+.env
+.env.local
