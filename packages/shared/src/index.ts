@@ -14,6 +14,8 @@ export {
   SCENE_TRANSITION_DIRECTIONS,
   ImageAnimationType,
   IMAGE_ANIMATION_TYPES,
+  VideoTemplateId,
+  VIDEO_TEMPLATE_IDS,
 } from "./schema";
 export type {
   VideoScene,
@@ -24,6 +26,6 @@ export type {
 
 export {
   USER_CREATED_AT_INDEX,
-  SIMPLE_VIDEO_COMPOSITION_ID,
+  VIDEO_COMPOSITION_ID,
   EnvVar,
 } from "./constants";

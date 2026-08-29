@@ -6,8 +6,10 @@ export const USER_CREATED_AT_INDEX = "userId-createdAt-index";
  * `packages/remotion-video` (ブラウザ/webpackバンドル側) と
  * `apps/worker` (Node.jsプロセス側, `selectComposition` 呼び出し) の
  * 両方から参照するため、JSXを含まないこのパッケージで共有する。
+ * 単一のコンポジションが `templateId` (CreateVideoRequest) に応じて
+ * 描画するテンプレート(レイアウト)を切り替える。
  */
-export const SIMPLE_VIDEO_COMPOSITION_ID = "SimpleVideo";
+export const VIDEO_COMPOSITION_ID = "VideoComposition";
 
 /** 環境変数キー (Lambda / Fargate 双方で共通利用) */
 export const EnvVar = {

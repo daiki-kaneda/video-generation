@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 // 名前付きインポートではなく名前空間インポートを使う。
@@ -17,6 +17,7 @@ const { CreateVideoRequestSchema } = sharedSchemas;
 
 const defaultValues: VideoFormInput = {
   title: "",
+  templateId: "simple",
   scenes: [
     {
       text: "",
@@ -29,6 +30,24 @@ const defaultValues: VideoFormInput = {
   width: 1920,
   height: 1080,
 };
+
+const TEMPLATE_OPTIONS: { value: string; label: string; description: string }[] = [
+  {
+    value: "simple",
+    label: "シンプル",
+    description: "全画面の画像/背景色に見出し・説明文を重ねるスライドショー",
+  },
+  {
+    value: "productShowcase",
+    label: "商品紹介",
+    description: "左に見出し・説明・価格/CTAバッジ、右に商品画像を配置",
+  },
+  {
+    value: "newsBulletin",
+    label: "ニュース速報",
+    description: "全画面背景 + カテゴリバッジ + 下部ロワーサード(見出し・説明)",
+  },
+];
 
 export const NewVideoPage: React.FC = () => {
   const navigate = useNavigate();
@@ -47,6 +66,7 @@ export const NewVideoPage: React.FC = () => {
     resolver: zodResolver(CreateVideoRequestSchema),
     defaultValues,
   });
+  const templateId = useWatch({ control, name: "templateId" }) ?? "simple";
 
   const onSubmit: SubmitHandler<VideoFormOutput> = async (data) => {
     setSubmitError(undefined);
@@ -84,10 +104,44 @@ export const NewVideoPage: React.FC = () => {
           </label>
 
           <div>
+            <span className="block text-sm text-slate-600">テンプレート</span>
+            <div className="mt-2 grid gap-3 sm:grid-cols-3">
+              {TEMPLATE_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors ${
+                    templateId === option.value
+                      ? "border-slate-900 bg-slate-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    value={option.value}
+                    {...register("templateId")}
+                    className="sr-only"
+                  />
+                  <span className="block font-medium text-slate-900">
+                    {option.label}
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    {option.description}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <h2 className="mb-2 text-sm font-medium text-slate-700">
               シーン構成
             </h2>
-            <SceneEditor control={control} register={register} errors={errors} />
+            <SceneEditor
+              control={control}
+              register={register}
+              errors={errors}
+              templateId={templateId}
+            />
             {errors.scenes?.message ? (
               <p className="mt-1 text-xs text-red-500">
                 {errors.scenes.message}
