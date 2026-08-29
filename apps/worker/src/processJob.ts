@@ -5,6 +5,7 @@ import { VideoJobMessageSchema, VideoJobStatus } from "@video-generation/shared"
 import { sqsClient } from "./clients";
 import { config } from "./config";
 import { getJob, markCompleted, markFailed, markProcessing } from "./db";
+import { applyNarration } from "./narration";
 import { renderVideo } from "./render";
 import { uploadRenderedVideo } from "./storage";
 import { notifyFailure, notifySuccess } from "./notify";
@@ -60,7 +61,11 @@ export const processMessage = async (message: Message): Promise<void> => {
 
   let localFilePath: string | undefined;
   try {
-    localFilePath = await renderVideo(videoId, job.input);
+    // ナレーションが有効な場合、レンダリング前にPollyで音声合成し、
+    // シーンの `narrationAudioUrl`/`durationInSeconds` を確定させてから渡す。
+    // (Remotion コンポジション自体はAWS SDKを呼ばず、確定済みの入力だけを扱う)
+    const renderInput = await applyNarration(job.input);
+    localFilePath = await renderVideo(videoId, renderInput);
     const output = await uploadRenderedVideo(videoId, localFilePath);
     await markCompleted(videoId, output);
     await notifySuccess(job.notifyEmail, videoId, job.input.title, output.outputUrl);

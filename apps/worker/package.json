@@ -6,10 +6,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && node --test dist/narration.test.js",
     "start": "node dist/index.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.687.0",
+    "@aws-sdk/client-polly": "^3.687.0",
     "@aws-sdk/client-s3": "^3.687.0",
     "@aws-sdk/client-ses": "^3.687.0",
     "@aws-sdk/client-sqs": "^3.687.0",
