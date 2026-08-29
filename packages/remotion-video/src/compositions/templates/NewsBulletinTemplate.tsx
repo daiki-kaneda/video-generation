@@ -1,11 +1,11 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
-import { AnimatedImage } from "../../components/AnimatedImage";
+import { SceneMedia } from "../../components/SceneMedia";
 import type { SceneTemplateComponent } from "./types";
 
 /**
  * ニュース速報風テンプレート。
- * 全画面背景の上に、左上のカテゴリ/速報バッジ・下部ロワーサード(見出し+説明)・
+ * 全画面背景(画像/動画クリップ)の上に、左上のカテゴリ/速報バッジ・下部ロワーサード(見出し+説明)・
  * 右下の番組名(動画タイトル)の透かしを重ねる。
  */
 export const NewsBulletinTemplate: SceneTemplateComponent = ({
@@ -19,7 +19,7 @@ export const NewsBulletinTemplate: SceneTemplateComponent = ({
       overflow: "hidden",
     }}
   >
-    <AnimatedImage scene={scene} durationInFrames={durationInFrames} />
+    <SceneMedia scene={scene} durationInFrames={durationInFrames} />
 
     <div
       style={{
