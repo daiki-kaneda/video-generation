@@ -3,7 +3,7 @@ import os from "node:os";
 import { bundle } from "@remotion/bundler";
 import { ensureBrowser, renderMedia, selectComposition } from "@remotion/renderer";
 import {
-  SIMPLE_VIDEO_COMPOSITION_ID,
+  VIDEO_COMPOSITION_ID,
   type CreateVideoRequest,
 } from "@video-generation/shared";
 
@@ -48,7 +48,7 @@ export const renderVideo = async (
 
   const composition = await selectComposition({
     serveUrl,
-    id: SIMPLE_VIDEO_COMPOSITION_ID,
+    id: VIDEO_COMPOSITION_ID,
     inputProps: input,
   });
 

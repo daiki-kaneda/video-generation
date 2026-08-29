@@ -3,5 +3,5 @@ import { RemotionRoot } from "./Root";
 
 registerRoot(RemotionRoot);
 
-export { SimpleVideo } from "./compositions/SimpleVideo";
-export type { SimpleVideoProps } from "./compositions/SimpleVideo";
+export { VideoComposition } from "./compositions/VideoComposition";
+export type { VideoCompositionProps } from "./compositions/VideoComposition";
