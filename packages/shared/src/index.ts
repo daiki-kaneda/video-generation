@@ -12,6 +12,8 @@ export {
   SCENE_TRANSITION_TYPES,
   SceneTransitionDirection,
   SCENE_TRANSITION_DIRECTIONS,
+  ImageAnimationType,
+  IMAGE_ANIMATION_TYPES,
 } from "./schema";
 export type {
   VideoScene,
