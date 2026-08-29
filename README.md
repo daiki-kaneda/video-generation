@@ -30,8 +30,9 @@ Remotionでレンダリングし、完了後にメール(SES)で通知します�
 | SQS | 動画生成ジョブのキュー(+DLQ) |
 | Fargate (ECS) | Remotionレンダリングを実行する常駐ワーカー |
 | DynamoDB | ジョブのステータス・メタデータ管理 |
-| S3 | 入力アセット・生成済み動画の保存 |
+| S3 | 入力アセット・生成済み動画の保存、フロントエンド(SPA)の静的ホスティング |
 | SES | 完了/失敗のメール通知 |
+| CloudFront | フロントエンド(React SPA)の配信(S3をOAC経由でオリジンに設定) |
 
 ## リポジトリ構成
 
@@ -41,11 +42,12 @@ Remotionでレンダリングし、完了後にメール(SES)で通知します�
 │   └── architecture.md        # アーキテクチャ設計・構成図
 ├── infra/                     # AWS CDK (TypeScript) - 全AWSリソースを定義
 ├── packages/
-│   ├── shared/                # API/Worker/Infra 共通の型・zodスキーマ・定数
+│   ├── shared/                # API/Worker/Infra/Web 共通の型・zodスキーマ・定数
 │   └── remotion-video/        # Remotion コンポジション (動画テンプレート)
 └── apps/
     ├── api/                   # API Gateway から呼ばれる Lambda ハンドラー
-    └── worker/                # SQSポーリング + Remotionレンダリングを行うFargateワーカー
+    ├── worker/                # SQSポーリング + Remotionレンダリングを行うFargateワーカー
+    └── web/                   # React (Vite) SPA。CloudFront + S3 で配信するフロントエンド
 ```
 
 ## セットアップ
@@ -74,6 +76,30 @@ npm run build       # 全ワークスペースのビルド
 npm run studio --workspace=@video-generation/remotion-video
 ```
 
+## フロントエンド (React SPA)
+
+`apps/web` は Vite + React + TypeScript + Tailwind CSS のSPAです。詳細な設計は
+[docs/frontend-plan.md](./docs/frontend-plan.md) を参照してください。
+
+### ローカル開発
+
+```bash
+npm run dev --workspace=@video-generation/web
+```
+
+`http://localhost:5173` で起動します。`public/config.json` にローカル開発用のダミー設定
+(`apiUrl`, `userPoolId`, `userPoolClientId`, `region`)が入っているので、実際にログインや
+API呼び出しを試す場合はデプロイ済みのスタックの値に書き換えてください
+(本番ビルドでは、この値はCDKがデプロイ時に自動生成する `config.json` に置き換わります)。
+
+### 本番ビルド
+
+```bash
+npm run build --workspace=@video-generation/web   # apps/web/dist/ を生成
+```
+
+CloudFront+S3へのデプロイ(`config.json`の生成込み)は `infra` の CDK デプロイに含まれています(後述)。
+
 ## デプロイ (AWS CDK)
 
 `infra/` に AWS CDK (TypeScript) スタックがあります。デプロイには Docker(ワーカーのコンテナイメージビルド用)と、
@@ -82,16 +108,22 @@ AWSクレデンシャル・CDK Bootstrap 済みの環境が必要です。
 ```bash
 cd infra
 npx cdk bootstrap        # 初回のみ
+npm run build:web        # apps/web/dist/ を生成 (Frontendのbucket deploymentに必要)
 npx cdk deploy \
   --context namePrefix=video-gen-dev \
   --context sesSenderEmail=notify@example.com
 ```
 
+`npm run synth` / `npm run diff` / `npm run deploy`(`infra/package.json` 経由)を使う場合は、
+`presynth` / `prediff` / `predeploy` フックが自動的に `apps/web` をビルドしてから実行します。
+
 - `namePrefix`: 作成するリソース名の接頭辞(環境ごとに変更可能)
 - `sesSenderEmail`: 通知メールの送信元アドレス。SES未検証の場合、SESのサンドボックス制限により
   受信者アドレスも別途検証が必要です(SESの本番アクセス申請、または検証済みアドレスへの送信のみ可能)。
 
-デプロイ後、`ApiUrl` / `UserPoolId` / `UserPoolClientId` などがスタックの Output として出力されます。
+デプロイ後、`ApiUrl` / `UserPoolId` / `UserPoolClientId` / `FrontendUrl`(CloudFrontのURL)などが
+スタックの Output として出力されます。`FrontendConstruct` が `apps/web/dist` と、スタックの出力値から
+生成した `config.json` をS3へアップロードし、CloudFrontのキャッシュを自動的に無効化します。
 
 ## API
 

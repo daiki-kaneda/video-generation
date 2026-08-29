@@ -8,6 +8,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:web": "npm run build --workspace=@video-generation/web --prefix ..",
+    "presynth": "npm run build:web",
+    "prediff": "npm run build:web",
+    "predeploy": "npm run build:web",
     "synth": "cdk synth",
     "diff": "cdk diff",
     "deploy": "cdk deploy"
