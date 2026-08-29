@@ -72,6 +72,72 @@ export const VIDEO_TEMPLATE_IDS = Object.values(
 ) as [VideoTemplateId, ...VideoTemplateId[]];
 
 /**
+ * ナレーション音声合成に使う Amazon Polly のエンジン。
+ * `standard`: 最安(100万文字$4.00)。日本語は Mizuki(女性)/Takumi(男性)のみ対応。
+ * `neural`: より自然な抑揚(100万文字$16.00、Standardの4倍)。日本語は Takumi/Kazuha/Tomoko が対応。
+ * コスト最小化のため既定は `standard`。
+ */
+export const NarrationEngine = {
+  STANDARD: "standard",
+  NEURAL: "neural",
+} as const;
+export type NarrationEngine =
+  (typeof NarrationEngine)[keyof typeof NarrationEngine];
+export const NARRATION_ENGINES = Object.values(
+  NarrationEngine,
+) as [NarrationEngine, ...NarrationEngine[]];
+
+/** ナレーションに使用する Amazon Polly の日本語(ja-JP)対応音声 */
+export const NarrationVoiceId = {
+  MIZUKI: "Mizuki",
+  TAKUMI: "Takumi",
+  KAZUHA: "Kazuha",
+  TOMOKO: "Tomoko",
+} as const;
+export type NarrationVoiceId =
+  (typeof NarrationVoiceId)[keyof typeof NarrationVoiceId];
+export const NARRATION_VOICE_IDS = Object.values(
+  NarrationVoiceId,
+) as [NarrationVoiceId, ...NarrationVoiceId[]];
+
+/**
+ * エンジンごとに利用可能な voiceId (Amazon Polly の日本語音声の対応表)。
+ * Standardエンジンは Mizuki/Takumi のみ、Neuralエンジンは Takumi/Kazuha/Tomoko のみ対応。
+ */
+export const NARRATION_VOICES_BY_ENGINE: Record<
+  NarrationEngine,
+  readonly NarrationVoiceId[]
+> = {
+  standard: [NarrationVoiceId.MIZUKI, NarrationVoiceId.TAKUMI],
+  neural: [
+    NarrationVoiceId.TAKUMI,
+    NarrationVoiceId.KAZUHA,
+    NarrationVoiceId.TOMOKO,
+  ],
+};
+
+/**
+ * 動画全体のナレーション自動生成設定。
+ * コストが発生する機能のため、既定では無効(`enabled: false`)。
+ * 有効化した場合、ワーカーがレンダリング前にシーンごとのテキストを
+ * Amazon Pollyで音声合成し、`VideoScene.narrationAudioUrl` を自動的に設定する。
+ */
+export const NarrationConfigSchema = z
+  .object({
+    /** ナレーション自動生成を有効にするか (既定は無効) */
+    enabled: z.boolean().default(false),
+    /** 合成エンジン。コスト最小化のため既定は最安の standard */
+    engine: z.enum(NARRATION_ENGINES).default("standard"),
+    /** 読み上げ音声。engine ごとに選べる voice が異なる (`NARRATION_VOICES_BY_ENGINE` 参照) */
+    voiceId: z.enum(NARRATION_VOICE_IDS).default("Takumi"),
+  })
+  .refine((value) => NARRATION_VOICES_BY_ENGINE[value.engine].includes(value.voiceId), {
+    message: "選択したエンジンではこの音声(voiceId)は利用できません",
+    path: ["voiceId"],
+  });
+export type NarrationConfig = z.infer<typeof NarrationConfigSchema>;
+
+/**
  * 1シーン分の内容。Remotion の Composition (`VideoComposition`) が
  * このスキーマの配列をそのまま `inputProps.scenes` として受け取る。
  */
@@ -119,6 +185,20 @@ export const VideoSceneSchema = z.object({
    * - `simple`: 未使用
    */
   badgeText: z.string().max(40).optional(),
+  /**
+   * ナレーションとして読み上げるテキスト (任意)。
+   * 未指定の場合は `text` + `subtext` を結合した文章を読み上げる。
+   * `CreateVideoRequest.narration.enabled` が true の場合のみ使用される。
+   */
+  narrationText: z.string().max(560).optional(),
+  /** このシーンだけナレーションを無効化する (動画全体でナレーションが有効な場合でも読み上げない) */
+  narrationSkip: z.boolean().default(false),
+  /**
+   * ワーカーがAmazon Pollyで合成したナレーション音声のURL。
+   * 通常はレンダリング前処理で自動的に設定される計算済みフィールドであり、
+   * ユーザーが直接指定した場合はそれを優先し、Pollyの呼び出しをスキップする。
+   */
+  narrationAudioUrl: z.string().url().optional(),
 });
 export type VideoScene = z.infer<typeof VideoSceneSchema>;
 
@@ -141,6 +221,8 @@ export const CreateVideoRequestSchema = z.object({
   height: z.number().int().min(16).max(3840).default(1080),
   /** BGM 等の音声ファイル (任意) */
   audioUrl: z.string().url().optional(),
+  /** ナレーション自動生成の設定 (既定では無効) */
+  narration: NarrationConfigSchema.default({}),
   /**
    * 生成完了/失敗通知の送信先。省略時は Cognito トークンの email クレームを使用する。
    */

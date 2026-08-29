@@ -16,12 +16,19 @@ export {
   IMAGE_ANIMATION_TYPES,
   VideoTemplateId,
   VIDEO_TEMPLATE_IDS,
+  NarrationEngine,
+  NARRATION_ENGINES,
+  NarrationVoiceId,
+  NARRATION_VOICE_IDS,
+  NARRATION_VOICES_BY_ENGINE,
+  NarrationConfigSchema,
 } from "./schema";
 export type {
   VideoScene,
   CreateVideoRequest,
   VideoJobRecord,
   VideoJobMessage,
+  NarrationConfig,
 } from "./schema";
 
 export {
