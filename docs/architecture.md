@@ -165,11 +165,12 @@ VideoComposition (packages/remotion-video/src/compositions/VideoComposition.tsx)
 
 - `packages/remotion-video/src/Root.tsx` には本番と同じ `VIDEO_COMPOSITION_ID` に加え、
   Remotion Studio でテンプレートごとのプレビューを見やすくするための
-  `VideoComposition-ProductShowcase` / `VideoComposition-NewsBulletin` という
+  `VideoComposition-ProductShowcase` / `VideoComposition-NewsBulletin` / `VideoComposition-VideoClip` という
   プレビュー専用コンポジション(本番のレンダリングパスでは未使用)も登録している。
-- 背景画像のKen Burnsアニメーション(`packages/remotion-video/src/components/AnimatedImage.tsx`)や
-  シーン切り替えトランジション(`packages/remotion-video/src/transitions.ts`)はテンプレート非依存の
-  共通ロジックとして切り出されており、どのテンプレートを選んでも利用できる。
+- 背景メディアの描画(`packages/remotion-video/src/components/SceneMedia.tsx`)、
+  画像のKen Burnsアニメーション(`components/AnimatedImage.tsx`)、実写動画クリップの合成
+  (`components/AnimatedVideo.tsx`)、シーン切り替えトランジション(`../transitions.ts`)はテンプレート
+  非依存の共通ロジックとして切り出されており、どのテンプレートを選んでも利用できる。
 
 ### テンプレート一覧 (`templateId`)
 
@@ -184,6 +185,31 @@ VideoComposition (packages/remotion-video/src/compositions/VideoComposition.tsx)
 - 新しいテンプレートを追加する場合は、`SceneTemplateComponent` を実装した
   コンポーネントを作成し、`VideoComposition.tsx` の `SCENE_TEMPLATES` に登録した上で
   `VideoTemplateId` (`packages/shared/src/schema.ts`) に選択肢を追加する。
+
+### 実写動画クリップの合成 (`videoUrl`)
+
+シーンの背景には静止画(`imageUrl`)だけでなく、`videoUrl` を指定して実写動画クリップ(mp4等)を
+そのまま合成できる。両方指定された場合は `videoUrl` が優先され、`imageUrl`/Ken Burnsアニメーションは
+無視される。
+
+| フィールド | 説明 |
+|---|---|
+| `videoUrl` | 背景に合成する動画クリップのURL(S3の公開/署名付きURL、または http(s) URL) |
+| `videoStartFromSeconds` (既定 0) | クリップの再生開始位置(秒)。一部だけをトリミングして使う場合に指定 |
+| `videoVolume` (0〜1, 既定 0) | クリップ自体の音量。既定はミュートで、`audioUrl` のBGMと音が重ならないようにしている |
+
+- 描画は `packages/remotion-video/src/components/SceneMedia.tsx` が担い、`videoUrl` があれば
+  `AnimatedVideo.tsx`、無ければ `AnimatedImage.tsx`(画像/Ken Burns)、どちらも無ければ何も描画しない
+  (`backgroundColor` がそのまま見える)、という優先順位で描画コンポーネントを切り替える。
+  3つのテンプレート(`SimpleTemplate`/`ProductShowcaseTemplate`/`NewsBulletinTemplate`)は全て
+  `SceneMedia` 経由で背景を描画するため、どのテンプレートでも画像/動画を同じように扱える。
+- 動画クリップの描画には Remotion の `<Video>` ではなく `<OffthreadVideo>` を使用している。
+  `<OffthreadVideo>` はサーバーサイドレンダリング時にffmpegで1フレームずつ正確に抽出するため、
+  ブラウザの動画デコードタイミングに依存せず決定的なレンダリング結果になる
+  (Remotion公式もレンダリング用途では `OffthreadVideo` を推奨している)。
+- シーンの表示時間 (`durationInSeconds`) がクリップの残り尺(トリミング後)より長い場合、
+  クリップは自然に終端で止まる(ループはしない)。ループ再生が必要な場合は将来の拡張候補とする。
+- シーン切り替えトランジション(下記)は動画クリップの背景にもそのまま適用できる。
 
 ### シーン切り替えトランジション
 
@@ -236,5 +262,6 @@ VideoComposition (packages/remotion-video/src/compositions/VideoComposition.tsx)
 - CloudFront + S3 で生成済み動画を配信し、`outputUrl` をCDN経由の署名付きURLにする。
 - Step Functions を挟んでレンダリングの前処理(音声合成・素材取得など)を複数ステップに分割する。
 - WebSocket API (API Gateway) や SNS でリアルタイム進捗通知を追加する。
-- 実写動画クリップ(`<Video>`)の合成、TTSによるナレーション自動生成、グラフ/データビジュアライゼーション、
+- 動画クリップのループ再生対応(クリップ尺 < シーン尺の場合)、再生速度(`playbackRate`)調整、
+  TTSによるナレーション自動生成、グラフ/データビジュアライゼーション、
   ロゴ/ウォーターマークのアップロード対応など、テンプレートで使える表現の拡充。
