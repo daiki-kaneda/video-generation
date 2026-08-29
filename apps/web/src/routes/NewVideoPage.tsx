@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
@@ -13,7 +13,7 @@ import { useCreateVideo } from "../hooks/useCreateVideo";
 import { ApiError } from "../lib/apiClient";
 import type { VideoFormInput, VideoFormOutput } from "../types/videoForm";
 
-const { CreateVideoRequestSchema } = sharedSchemas;
+const { CreateVideoRequestSchema, NARRATION_VOICES_BY_ENGINE } = sharedSchemas;
 
 const defaultValues: VideoFormInput = {
   title: "",
@@ -29,6 +29,20 @@ const defaultValues: VideoFormInput = {
   fps: 30,
   width: 1920,
   height: 1080,
+  narration: { enabled: false, engine: "standard", voiceId: "Takumi" },
+};
+
+const NARRATION_ENGINE_OPTIONS: { value: string; label: string }[] = [
+  { value: "standard", label: "Standard(低コスト・既定 / 100万文字$4)" },
+  { value: "neural", label: "Neural(高品質 / 100万文字$16, Standardの4倍)" },
+];
+
+/** voiceId ごとの表示名(性別)。利用可否は NARRATION_VOICES_BY_ENGINE で判定する。 */
+const NARRATION_VOICE_LABELS: Record<string, string> = {
+  Takumi: "Takumi(男性)",
+  Mizuki: "Mizuki(女性)",
+  Kazuha: "Kazuha(女性)",
+  Tomoko: "Tomoko(女性)",
 };
 
 const TEMPLATE_OPTIONS: { value: string; label: string; description: string }[] = [
@@ -61,12 +75,27 @@ export const NewVideoPage: React.FC = () => {
     register,
     control,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<VideoFormInput, unknown, VideoFormOutput>({
     resolver: zodResolver(CreateVideoRequestSchema),
     defaultValues,
   });
   const templateId = useWatch({ control, name: "templateId" }) ?? "simple";
+  const narrationEnabled = useWatch({ control, name: "narration.enabled" }) ?? false;
+  const narrationEngine =
+    useWatch({ control, name: "narration.engine" }) ?? "standard";
+  const narrationVoiceId = useWatch({ control, name: "narration.voiceId" });
+  const availableVoices = NARRATION_VOICES_BY_ENGINE[narrationEngine] ?? [];
+
+  useEffect(() => {
+    // エンジン切り替え時、現在選択中のvoiceIdが新エンジンで使えない場合は
+    // そのエンジンで利用可能な最初のvoiceIdに自動修正する
+    // (例: Neural選択中にStandardへ戻すと Kazuha/Tomoko は選べなくなる)。
+    if (narrationVoiceId && !availableVoices.includes(narrationVoiceId)) {
+      setValue("narration.voiceId", availableVoices[0]);
+    }
+  }, [narrationEngine, narrationVoiceId, availableVoices, setValue]);
 
   const onSubmit: SubmitHandler<VideoFormOutput> = async (data) => {
     setSubmitError(undefined);
@@ -132,6 +161,51 @@ export const NewVideoPage: React.FC = () => {
             </div>
           </div>
 
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input
+                type="checkbox"
+                {...register("narration.enabled")}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              ナレーションを自動生成する(Amazon Polly)
+            </label>
+            <p className="mt-1 text-xs text-slate-400">
+              各シーンの見出し・説明文を読み上げます。追加費用が発生します(既定のStandardエンジンなら
+              動画1本あたり数円未満が目安)。
+            </p>
+            {narrationEnabled ? (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <label className="text-sm text-slate-600">
+                  エンジン
+                  <select
+                    {...register("narration.engine")}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-900"
+                  >
+                    {NARRATION_ENGINE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm text-slate-600">
+                  読み上げ音声
+                  <select
+                    {...register("narration.voiceId")}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-900"
+                  >
+                    {availableVoices.map((voice) => (
+                      <option key={voice} value={voice}>
+                        {NARRATION_VOICE_LABELS[voice] ?? voice}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+          </div>
+
           <div>
             <h2 className="mb-2 text-sm font-medium text-slate-700">
               シーン構成
@@ -141,6 +215,7 @@ export const NewVideoPage: React.FC = () => {
               register={register}
               errors={errors}
               templateId={templateId}
+              narrationEnabled={narrationEnabled}
             />
             {errors.scenes?.message ? (
               <p className="mt-1 text-xs text-red-500">

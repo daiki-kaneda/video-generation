@@ -12,6 +12,8 @@ interface SceneEditorProps {
   register: UseFormRegister<VideoFormInput>;
   errors: FieldErrors<VideoFormInput>;
   templateId: string;
+  /** 動画全体でナレーション自動生成が有効かどうか(シーン単位の設定欄の表示切り替えに使用) */
+  narrationEnabled: boolean;
 }
 
 const MAX_SCENES = 30;
@@ -70,6 +72,7 @@ const SceneItem: React.FC<SceneItemProps> = ({
   register,
   errors,
   templateId,
+  narrationEnabled,
   index,
   isFirst,
   isLast,
@@ -95,6 +98,10 @@ const SceneItem: React.FC<SceneItemProps> = ({
   const hasVideo = Boolean(videoUrl);
   const hasImage = Boolean(imageUrl) && !hasVideo;
   const showIntensity = hasImage && (imageAnimation ?? "none") !== "none";
+  const narrationSkip = useWatch({
+    control,
+    name: `scenes.${index}.narrationSkip`,
+  });
 
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
@@ -322,6 +329,29 @@ const SceneItem: React.FC<SceneItemProps> = ({
         </div>
       )}
 
+      {narrationEnabled ? (
+        <div className="space-y-2 border-t border-slate-100 pt-3">
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              {...register(`scenes.${index}.narrationSkip`)}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            このシーンのナレーションを無効化する
+          </label>
+          {!narrationSkip ? (
+            <label className="block text-sm text-slate-600">
+              読み上げテキスト(任意, 未指定ならメインテキスト+サブテキストを読み上げ)
+              <input
+                {...register(`scenes.${index}.narrationText`)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-900"
+                placeholder="例: 本日の主要ニュースです。"
+              />
+            </label>
+          ) : null}
+        </div>
+      ) : null}
+
       {sceneErrors ? (
         <p className="text-xs text-red-500">
           {Object.values(sceneErrors)
@@ -339,6 +369,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   register,
   errors,
   templateId,
+  narrationEnabled,
 }) => {
   const { fields, append, remove, move } = useFieldArray({
     control,
@@ -354,6 +385,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
           register={register}
           errors={errors}
           templateId={templateId}
+          narrationEnabled={narrationEnabled}
           index={index}
           isFirst={index === 0}
           isLast={index === fields.length - 1}
