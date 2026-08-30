@@ -5,6 +5,11 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { SESClient } from "@aws-sdk/client-ses";
 import { PollyClient } from "@aws-sdk/client-polly";
 
+/**
+ * AWS SDKクライアントのインスタンス化。
+ * AWS依存を持つのはこの `infrastructure` 層のみであり、
+ * `application`(ユースケース・ポート)・`domain`(エンティティ)からは一切参照されない。
+ */
 const ddbClient = new DynamoDBClient({});
 export const docClient = DynamoDBDocumentClient.from(ddbClient, {
   marshallOptions: { removeUndefinedValues: true },

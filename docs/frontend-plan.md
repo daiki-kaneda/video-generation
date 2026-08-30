@@ -237,7 +237,7 @@ export class FrontendConstruct extends Construct {
 ## 11. セキュリティ・運用上の考慮事項
 
 - **XSS対策**: トークンをJSに保持するSPA構成のため、CSP(`Content-Security-Policy`)をCloudFrontのレスポンスヘッダーポリシー(`ResponseHeadersPolicy`)で付与し、外部スクリプト実行元を制限
-- **署名付きURLの有効期限**: `outputUrl`は現状7日間有効(`apps/worker/src/storage.ts`)。フロントエンドでは期限切れの可能性を考慮し、`GET /videos/{id}`を再取得すれば最新の署名付きURLを取れる設計(署名は都度生成されるため再取得で解決)
+- **署名付きURLの有効期限**: `outputUrl`は現状7日間有効(`apps/worker/src/infrastructure/aws/S3VideoStorage.ts`)。フロントエンドでは期限切れの可能性を考慮し、`GET /videos/{id}`を再取得すれば最新の署名付きURLを取れる設計(署名は都度生成されるため再取得で解決)
 - **CloudFrontキャッシュとAPI**: SPAの静的アセットのみCloudFront経由。API呼び出しはCloudFrontを介さずAPI Gatewayへ直接行う(将来的にカスタムドメイン統一が必要であれば、CloudFrontに `/api/*` ビヘイビアを追加してAPI Gatewayをオリジンにする構成へ拡張可能)
 - **ログアウト**: `CognitoUser.signOut()` でローカルのトークンを破棄(サーバー側セッションはCognito側のリフレッシュトークン無効化APIを使う場合は別途 `GlobalSignOut` 呼び出しを検討)
 

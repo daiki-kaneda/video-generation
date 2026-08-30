@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getNarrationCacheKey, resolveNarrationText } from "./narration";
+import { buildNarrationCacheKey, resolveNarrationText } from "./NarrationRequest";
 
 test("resolveNarrationText: narrationSkip=trueなら読み上げない", () => {
   const result = resolveNarrationText({
@@ -52,31 +52,31 @@ test("resolveNarrationText: 空白のみのテキストは無視される", () =
   assert.equal(result, undefined);
 });
 
-test("getNarrationCacheKey: 同一の入力は同一のキーになる(キャッシュ再利用の前提)", () => {
-  const keyA = getNarrationCacheKey("こんにちは", "standard", "Takumi");
-  const keyB = getNarrationCacheKey("こんにちは", "standard", "Takumi");
+test("buildNarrationCacheKey: 同一の入力は同一のキーになる(キャッシュ再利用の前提)", () => {
+  const keyA = buildNarrationCacheKey("こんにちは", "standard", "Takumi");
+  const keyB = buildNarrationCacheKey("こんにちは", "standard", "Takumi");
   assert.equal(keyA, keyB);
 });
 
-test("getNarrationCacheKey: テキストが異なれば別のキーになる", () => {
-  const keyA = getNarrationCacheKey("こんにちは", "standard", "Takumi");
-  const keyB = getNarrationCacheKey("さようなら", "standard", "Takumi");
+test("buildNarrationCacheKey: テキストが異なれば別のキーになる", () => {
+  const keyA = buildNarrationCacheKey("こんにちは", "standard", "Takumi");
+  const keyB = buildNarrationCacheKey("さようなら", "standard", "Takumi");
   assert.notEqual(keyA, keyB);
 });
 
-test("getNarrationCacheKey: engineが異なれば別のキーになる(コスト差を明確に分離するため)", () => {
-  const keyA = getNarrationCacheKey("こんにちは", "standard", "Takumi");
-  const keyB = getNarrationCacheKey("こんにちは", "neural", "Takumi");
+test("buildNarrationCacheKey: engineが異なれば別のキーになる(コスト差を明確に分離するため)", () => {
+  const keyA = buildNarrationCacheKey("こんにちは", "standard", "Takumi");
+  const keyB = buildNarrationCacheKey("こんにちは", "neural", "Takumi");
   assert.notEqual(keyA, keyB);
 });
 
-test("getNarrationCacheKey: voiceIdが異なれば別のキーになる", () => {
-  const keyA = getNarrationCacheKey("こんにちは", "standard", "Takumi");
-  const keyB = getNarrationCacheKey("こんにちは", "standard", "Mizuki");
+test("buildNarrationCacheKey: voiceIdが異なれば別のキーになる", () => {
+  const keyA = buildNarrationCacheKey("こんにちは", "standard", "Takumi");
+  const keyB = buildNarrationCacheKey("こんにちは", "standard", "Mizuki");
   assert.notEqual(keyA, keyB);
 });
 
-test("getNarrationCacheKey: engine/voiceIdごとにプレフィックスが分かれる", () => {
-  const key = getNarrationCacheKey("こんにちは", "standard", "Takumi");
-  assert.match(key, /^tts-cache\/standard\/Takumi\/[0-9a-f]{64}\.mp3$/);
+test("buildNarrationCacheKey: engine/voiceIdごとにプレフィックスが分かれる(ストレージ非依存の論理キー)", () => {
+  const key = buildNarrationCacheKey("こんにちは", "standard", "Takumi");
+  assert.match(key, /^standard\/Takumi\/[0-9a-f]{64}$/);
 });
